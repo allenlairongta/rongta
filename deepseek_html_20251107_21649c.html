@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>国际电商仓库存管理系统 - 云端版</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .summary-card {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+        }
+        .table-responsive {
+            max-height: 400px;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+            border-bottom: 3px solid #0d6efd;
+        }
+        .editable {
+            cursor: pointer;
+        }
+        .editable:hover {
+            background-color: #f8f9fa;
+        }
+        .warning-text {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .system-title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .user-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .permission-badge {
+            font-size: 0.7em;
+            margin-left: 5px;
+        }
+        .sync-status {
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        .sync-success {
+            color: #28a745;
+        }
+        .sync-warning {
+            color: #ffc107;
+        }
+        .sync-error {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录界面 -->
+    <div id="login-page" class="container">
+        <div class="login-container">
+            <h2 class="text-center mb-4">国际电商仓库存管理系统</h2>
+            <div class="alert alert-info">
+                <small>云端版本 - 数据自动备份，多设备同步</small>
+            </div>
+            <form id="login-form">
+                <div class="mb-3">
+                    <label for="username" class="form-label">用户名</label>
+                    <input type="text" class="form-control" id="username" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">密码</label>
+                    <input type="password" class="form-control" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">登录</button>
+            </form>
+            <div class="mt-3">
+                <button class="btn btn-outline-secondary w-100" onclick="showDemoAccounts()">查看演示账号</button>
+            </div>
+            
+            <!-- 演示账号信息 -->
+            <div id="demo-accounts" class="mt-3" style="display: none;">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">演示账号：</h6>
+                        <p><strong>管理员</strong>: admin / admin123</p>
+                        <p><strong>生产主管</strong>: production / prod123</p>
+                        <p><strong>仓库主管</strong>: warehouse / ware123</p>
+                        <p><strong>销售员</strong>: sales / sales123</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主系统界面 -->
+    <div id="main-system" style="display: none;">
+        <div class="container-fluid py-4">
+            <!-- 用户信息栏 -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="user-info d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">国际电商仓库存管理系统</h4>
+                            <small>
+                                欢迎, <span id="current-user">用户</span> 
+                                <span class="permission-badge badge bg-light text-dark" id="user-role">角色</span>
+                                <span class="sync-status" id="sync-status"></span>
+                            </small>
+                        </div>
+                        <div>
+                            <button class="btn btn-light btn-sm" onclick="showUserManagement()" id="user-management-btn" style="display: none;">
+                                用户管理
+                            </button>
+                            <button class="btn btn-outline-light btn-sm ms-2" onclick="forceSync()" id="sync-btn">
+                                立即同步
+                            </button>
+                            <button class="btn btn-outline-light btn-sm ms-2" onclick="logout()">
+                                退出登录
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 库存概览 -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card summary-card">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">已下单未生产数量</h5>
+                            <h2 id="total-order">0</h2>
+                            <div id="order-by-product" class="mt-2 small"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card summary-card">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">已生产未出库数量</h5>
+                            <h2 id="total-production">0</h2>
+                            <div id="production-by-product" class="mt-2 small"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card summary-card">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">总出库数量</h5>
+                            <h2 id="total-shipment">0</h2>
+                            <div id="shipment-by-product" class="mt-2 small"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 功能导航 -->
+            <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="order-tab" data-bs-toggle="tab" data-bs-target="#order" type="button" role="tab">订单管理</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="production-tab" data-bs-toggle="tab" data-bs-target="#production" type="button" role="tab">生产管理</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="shipment-tab" data-bs-toggle="tab" data-bs-target="#shipment" type="button" role="tab">出库管理</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button" role="tab">库存统计</button>
+                </li>
+            </ul>
+            
+            <!-- 内容区域 -->
+            <div class="tab-content" id="myTabContent">
+                <!-- 订单管理 -->
+                <div class="tab-pane fade show active" id="order" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">订单管理</h5>
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addOrderModal" id="add-order-btn">新增订单</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>订单编号</th>
+                                            <th>产品名称</th>
+                                            <th>下单数量</th>
+                                            <th>已生产数量</th>
+                                            <th>未生产数量</th>
+                                            <th>下单日期</th>
+                                            <th>客户名称</th>
+                                            <th>状态</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="order-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 生产管理 -->
+                <div class="tab-pane fade" id="production" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">生产管理</h5>
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductionModal" id="add-production-btn">新增生产记录</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>生产批次</th>
+                                            <th>订单编号</th>
+                                            <th>产品名称</th>
+                                            <th>生产数量</th>
+                                            <th>已出库数量</th>
+                                            <th>未出库数量</th>
+                                            <th>生产日期</th>
+                                            <th>负责人</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="production-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 出库管理 -->
+                <div class="tab-pane fade" id="shipment" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">出库管理</h5>
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addShipmentModal" id="add-shipment-btn">新增出库记录</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>出库单号</th>
+                                            <th>订单编号</th>
+                                            <th>产品名称</th>
+                                            <th>出库数量</th>
+                                            <th>出库日期</th>
+                                            <th>客户名称</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="shipment-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 库存统计 -->
+                <div class="tab-pane fade" id="inventory" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">库存统计</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>产品名称</th>
+                                            <th>总下单数量</th>
+                                            <th>总生产数量</th>
+                                            <th>总出库数量</th>
+                                            <th>已下单未生产</th>
+                                            <th>已生产未出库</th>
+                                            <th>当前库存</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="inventory-table-body"></tbody>
+                                </table>
+                            </div>
+                            <div class="mt-4">
+                                <canvas id="inventoryChart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框部分 -->
+    <!-- 新增订单模态框 -->
+    <div class="modal fade" id="addOrderModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增订单</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="order-form">
+                        <div class="mb-3">
+                            <label for="order-id" class="form-label">订单编号</label>
+                            <input type="text" class="form-control" id="order-id" required>
+                            <div class="form-text">可自定义订单编号，如不填写将自动生成</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="order-product" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-quantity" class="form-label">下单数量</label>
+                            <input type="number" class="form-control" id="order-quantity" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-date" class="form-label">下单日期</label>
+                            <input type="date" class="form-control" id="order-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-customer" class="form-label">客户名称</label>
+                            <input type="text" class="form-control" id="order-customer" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-order">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增生产记录模态框 -->
+    <div class="modal fade" id="addProductionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增生产记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="production-form">
+                        <div class="mb-3">
+                            <label for="production-order-id" class="form-label">订单编号</label>
+                            <select class="form-control" id="production-order-id" required>
+                                <option value="">请选择订单编号</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="production-product" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-quantity" class="form-label">生产数量</label>
+                            <input type="number" class="form-control" id="production-quantity" required>
+                            <div class="form-text">最大可生产数量: <span id="max-production-quantity">0</span></div>
+                            <div id="production-quantity-warning" class="warning-text"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-date" class="form-label">生产日期</label>
+                            <input type="date" class="form-control" id="production-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-manager" class="form-label">负责人</label>
+                            <input type="text" class="form-control" id="production-manager" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-production">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增出库记录模态框 -->
+    <div class="modal fade" id="addShipmentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增出库记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="shipment-form">
+                        <div class="mb-3">
+                            <label for="shipment-order-id" class="form-label">订单编号</label>
+                            <select class="form-control" id="shipment-order-id" required>
+                                <option value="">请选择订单编号</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="shipment-product" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-quantity" class="form-label">出库数量</label>
+                            <input type="number" class="form-control" id="shipment-quantity" required>
+                            <div class="form-text">最大可出库数量: <span id="max-shipment-quantity">0</span></div>
+                            <div id="shipment-quantity-warning" class="warning-text"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-date" class="form-label">出库日期</label>
+                            <input type="date" class="form-control" id="shipment-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-customer" class="form-label">客户名称</label>
+                            <input type="text" class="form-control" id="shipment-customer" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-shipment">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 用户管理模态框 -->
+    <div class="modal fade" id="userManagementModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">用户管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <button class="btn btn-success mb-3" onclick="showAddUserModal()">添加新用户</button>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>用户名</th>
+                                    <th>角色</th>
+                                    <th>权限</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加用户模态框 -->
+    <div class="modal fade" id="addUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-user-form">
+                        <div class="mb-3">
+                            <label for="new-username" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="new-username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new-password" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="new-password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="user-role" class="form-label">角色</label>
+                            <select class="form-control" id="user-role" required>
+                                <option value="admin">管理员</option>
+                                <option value="production_manager">生产主管</option>
+                                <option value="warehouse_manager">仓库主管</option>
+                                <option value="sales">销售员</option>
+                                <option value="viewer">查看员</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="addNewUser()">添加用户</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // ==================== 配置区域 ====================
+        // 请替换为您的Supabase项目信息
+        const SUPABASE_CONFIG = {
+            url: 'https://your-project.supabase.co', // 替换为您的Project URL
+            key: 'your-anon-key' // 替换为您的anon public key
+        };
+
+        // ==================== 用户权限系统 ====================
+        const USER_ROLES = {
+            admin: {
+                name: '管理员',
+                permissions: ['order_manage', 'production_manage', 'shipment_manage', 'user_manage', 'view_all']
+            },
+            production_manager: {
+                name: '生产主管',
+                permissions: ['production_manage', 'view_all']
+            },
+            warehouse_manager: {
+                name: '仓库主管',
+                permissions: ['shipment_manage', 'view_all']
+            },
+            sales: {
+                name: '销售员',
+                permissions: ['order_manage', 'view_all']
+            },
+            viewer: {
+                name: '查看员',
+                permissions: ['view_all']
+            }
+        };
+
+        // 默认用户数据
+        const defaultUsers = [
+            { username: 'admin', password: 'admin123', role: 'admin' },
+            { username: 'production', password: 'prod123', role: 'production_manager' },
+            { username: 'warehouse', password: 'ware123', role: 'warehouse_manager' },
+            { username: 'sales', password: 'sales123', role: 'sales' }
+        ];
+
+        // ==================== 全局变量 ====================
+        let database = {
+            users: JSON.parse(localStorage.getItem('inventory_users')) || defaultUsers,
+            orders: [],
+            productions: [],
+            shipments: []
+        };
+
+        let currentUser = null;
+        let supabaseClient = null;
+        let lastSyncTime = null;
+
+        // ==================== Supabase初始化 ====================
+        function initializeSupabase() {
+            try {
+                supabaseClient = supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);
+                console.log('Supabase客户端初始化成功');
+                return true;
+            } catch (error) {
+                console.error('Supabase初始化失败:', error);
+                updateSyncStatus('error', '云端连接失败，使用本地模式');
+                return false;
+            }
+        }
+
+        // ==================== 云端数据服务 ====================
+        class CloudDataService {
+            // 从云端加载所有数据
+            async loadAllData() {
+                if (!supabaseClient) {
+                    throw new Error('Supabase未初始化');
+                }
+
+                try {
+                    const [ordersData, productionsData, shipmentsData] = await Promise.all([
+                        this.loadTableData('orders'),
+                        this.loadTableData('productions'),
+                        this.loadTableData('shipments')
+                    ]);
+
+                    return {
+                        orders: ordersData,
+                        productions: productionsData,
+                        shipments: shipmentsData
+                    };
+                } catch (error) {
+                    console.error('加载云端数据失败:', error);
+                    throw error;
+                }
+            }
+
+            // 加载单个表数据
+            async loadTableData(tableName) {
+                const { data, error } = await supabaseClient
+                    .from(tableName)
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) {
+                    console.error(`加载${tableName}失败:`, error);
+                    throw error;
+                }
+
+                return data || [];
+            }
+
+            // 保存数据到云端
+            async saveDataToCloud() {
+                if (!supabaseClient || !currentUser) {
+                    throw new Error('未初始化或未登录');
+                }
+
+                const savePromises = [];
+
+                // 保存订单数据
+                if (database.orders.length > 0) {
+                    const ordersWithMeta = database.orders.map(order => ({
+                        ...order,
+                        created_by: currentUser.username,
+                        updated_at: new Date().toISOString()
+                    }));
+                    savePromises.push(this.upsertData('orders', ordersWithMeta));
+                }
+
+                // 保存生产数据
+                if (database.productions.length > 0) {
+                    const productionsWithMeta = database.productions.map(production => ({
+                        ...production,
+                        created_by: currentUser.username,
+                        updated_at: new Date().toISOString()
+                    }));
+                    savePromises.push(this.upsertData('productions', productionsWithMeta));
+                }
+
+                // 保存出库数据
+                if (database.shipments.length > 0) {
+                    const shipmentsWithMeta = database.shipments.map(shipment => ({
+                        ...shipment,
+                        created_by: currentUser.username,
+                        updated_at: new Date().toISOString()
+                    }));
+                    savePromises.push(this.upsertData('shipments', shipmentsWithMeta));
+                }
+
+                await Promise.all(savePromises);
+                lastSyncTime = new Date();
+                updateSyncStatus('success', `同步成功 ${lastSyncTime.toLocaleTimeString()}`);
+            }
+
+            // 插入或更新数据
+            async upsertData(tableName, data) {
+                const { error } = await supabaseClient
+                    .from(tableName)
+                    .upsert(data, { onConflict: 'id' });
+
+                if (error) {
+                    console.error(`保存${tableName}失败:`, error);
+                    throw error;
+                }
+            }
+
+            // 删除数据
+            async deleteData(tableName, id) {
+                const { error } = await supabaseClient
+                    .from(tableName)
+                    .delete()
+                    .eq('id', id);
+
+                if (error) {
+                    console.error(`删除${tableName}记录失败:`, error);
+                    throw error;
+                }
+            }
+        }
+
+        const cloudService = new CloudDataService();
+
+        // ==================== 同步状态管理 ====================
+        function updateSyncStatus(status, message) {
+            const statusElement = document.getElementById('sync-status');
+            if (!statusElement) return;
+
+            statusElement.className = `sync-status sync-${status}`;
+            statusElement.textContent = message;
+        }
+
+        // ==================== 登录认证系统 ====================
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            const user = database.users.find(u => u.username === username && u.password === password);
+            if (user) {
+                currentUser = user;
+                localStorage.setItem('currentUser', JSON.stringify(user));
+                await initializeApp();
+            } else {
+                alert('用户名或密码错误！');
+            }
+        });
+
+        // ==================== 应用初始化 ====================
+        async function initializeApp() {
+            // 初始化Supabase
+            const supabaseInitialized = initializeSupabase();
+            
+            if (currentUser) {
+                try {
+                    // 尝试从云端加载数据
+                    if (supabaseInitialized) {
+                        const cloudData = await cloudService.loadAllData();
+                        database.orders = cloudData.orders;
+                        database.productions = cloudData.productions;
+                        database.shipments = cloudData.shipments;
+                        console.log('从云端加载数据成功');
+                        updateSyncStatus('success', '云端数据加载成功');
+                    } else {
+                        // 使用本地数据
+                        database.orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                        database.productions = JSON.parse(localStorage.getItem('productions') || '[]');
+                        database.shipments = JSON.parse(localStorage.getItem('shipments') || '[]');
+                        updateSyncStatus('warning', '使用本地数据');
+                    }
+                } catch (error) {
+                    // 云端失败时使用本地数据
+                    console.log('使用本地数据:', error);
+                    database.orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                    database.productions = JSON.parse(localStorage.getItem('productions') || '[]');
+                    database.shipments = JSON.parse(localStorage.getItem('shipments') || '[]');
+                    updateSyncStatus('warning', '使用本地数据');
+                }
+                
+                showMainSystem();
+                updateUI();
+            }
+        }
+
+        // ==================== 数据保存函数 ====================
+        async function saveData() {
+            try {
+                // 保存到本地存储
+                localStorage.setItem('orders', JSON.stringify(database.orders));
+                localStorage.setItem('productions', JSON.stringify(database.productions));
+                localStorage.setItem('shipments', JSON.stringify(database.shipments));
+                
+                // 尝试保存到云端
+                if (supabaseClient && currentUser) {
+                    await cloudService.saveDataToCloud();
+                }
+                
+                updateUI();
+            } catch (error) {
+                console.log('云端保存失败，但本地数据已保存:', error);
+                updateSyncStatus('warning', '本地已保存，云端同步失败');
+                updateUI();
+            }
+        }
+
+        // ==================== 强制同步函数 ====================
+        async function forceSync() {
+            if (!supabaseClient) {
+                alert('云端服务未初始化');
+                return;
+            }
+
+            try {
+                updateSyncStatus('warning', '同步中...');
+                await cloudService.saveDataToCloud();
+            } catch (error) {
+                console.error('强制同步失败:', error);
+                updateSyncStatus('error', '同步失败');
+            }
+        }
+
+        // ==================== 界面显示函数 ====================
+        function showMainSystem() {
+            document.getElementById('login-page').style.display = 'none';
+            document.getElementById('main-system').style.display = 'block';
+            
+            // 更新用户界面
+            document.getElementById('current-user').textContent = currentUser.username;
+            document.getElementById('user-role').textContent = USER_ROLES[currentUser.role].name;
+            
+            // 根据权限显示/隐藏功能
+            updateUIByPermissions();
+        }
+
+        function updateUIByPermissions() {
+            document.getElementById('user-management-btn').style.display = 
+                hasPermission('user_manage') ? 'block' : 'none';
+            document.getElementById('add-order-btn').style.display = 
+                hasPermission('order_manage') ? 'block' : 'none';
+            document.getElementById('add-production-btn').style.display = 
+                hasPermission('production_manage') ? 'block' : 'none';
+            document.getElementById('add-shipment-btn').style.display = 
+                hasPermission('shipment_manage') ? 'block' : 'none';
+        }
+
+        function hasPermission(permission) {
+            if (!currentUser) return false;
+            const userRole = USER_ROLES[currentUser.role];
+            return userRole.permissions.includes(permission);
+        }
+
+        // ==================== 退出登录 ====================
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            document.getElementById('login-page').style.display = 'block';
+            document.getElementById('main-system').style.display = 'none';
+            document.getElementById('login-form').reset();
+        }
+
+        // ==================== 演示账号显示 ====================
+        function showDemoAccounts() {
+            document.getElementById('demo-accounts').style.display = 'block';
+        }
+
+        // ==================== 用户管理函数 ====================
+        function showUserManagement() {
+            updateUserTable();
+            new bootstrap.Modal(document.getElementById('userManagementModal')).show();
+        }
+
+        function updateUserTable() {
+            const tbody = document.getElementById('user-table-body');
+            tbody.innerHTML = '';
+            
+            database.users.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${user.username}</td>
+                    <td>${USER_ROLES[user.role].name}</td>
+                    <td>${USER_ROLES[user.role].permissions.join(', ')}</td>
+                    <td><span class="badge bg-success">激活</span></td>
+                    <td>
+                        ${user.username !== 'admin' ? `
+                        <button class="btn btn-sm btn-warning" onclick="editUser('${user.username}')">编辑</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteUser('${user.username}')">删除</button>
+                        ` : '<span class="text-muted">系统管理员</span>'}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function showAddUserModal() {
+            new bootstrap.Modal(document.getElementById('addUserModal')).show();
+        }
+
+        function addNewUser() {
+            const username = document.getElementById('new-username').value;
+            const password = document.getElementById('new-password').value;
+            const role = document.getElementById('user-role').value;
+            
+            if (database.users.find(u => u.username === username)) {
+                alert('用户名已存在！');
+                return;
+            }
+            
+            database.users.push({ username, password, role });
+            localStorage.setItem('inventory_users', JSON.stringify(database.users));
+            
+            bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+            document.getElementById('add-user-form').reset();
+            updateUserTable();
+        }
+
+        function deleteUser(username) {
+            if (confirm(`确定要删除用户 ${username} 吗？`)) {
+                database.users = database.users.filter(u => u.username !== username);
+                localStorage.setItem('inventory_users', JSON.stringify(database.users));
+                updateUserTable();
+            }
+        }
+
+        // ==================== 业务逻辑函数 ====================
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // 更新订单表格
+        function updateOrderTable() {
+            const tbody = document.getElementById('order-table-body');
+            tbody.innerHTML = '';
+            
+            database.orders.forEach(order => {
+                const producedQuantity = database.productions
+                    .filter(p => p.orderId === order.id)
+                    .reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                
+                const remainingQuantity = parseInt(order.quantity) - producedQuantity;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="editable" onclick="editOrderId('${order.id}')">${order.id}</td>
