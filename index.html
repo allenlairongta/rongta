@@ -1,0 +1,2532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>国际电商仓库存管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- 添加Supabase客户端库 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .summary-card {
+            color: white;
+        }
+        .summary-order {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+        }
+        .summary-production {
+            background: linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%);
+        }
+        .summary-shipment {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+        }
+        .table-responsive {
+            max-height: 400px;
+            overflow: auto;
+        }
+        .table-responsive table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .table-responsive thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa;
+            z-index: 10;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+            border-bottom: 3px solid #0d6efd;
+        }
+        .editable {
+            cursor: pointer;
+        }
+        .editable:hover {
+            background-color: #f8f9fa;
+        }
+        .warning-text {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .system-title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .user-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            min-height: 80px;
+        }
+        .permission-badge {
+            font-size: 0.7em;
+            margin-left: 5px;
+        }
+        .readonly-field {
+            background-color: #f8f9fa;
+            color: #6c757d;
+        }
+        .export-import-buttons {
+            margin-bottom: 15px;
+        }
+        .export-import-buttons .btn {
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .user-info-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .search-sort-container {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .search-sort-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+        }
+        .sort-select {
+            width: auto;
+            min-width: 150px;
+        }
+        .inactive-warning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            z-index: 9999;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 9998;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        .max-quantity-help {
+            font-size: 0.875em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录界面 -->
+    <div id="login-page" class="container">
+        <div class="login-container">
+            <h2 class="text-center mb-4">国际电商仓库存管理系统</h2>
+            <form id="login-form">
+                <div class="mb-3">
+                    <label for="username" class="form-label">用户名</label>
+                    <input type="text" class="form-control" id="username" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">密码</label>
+                    <input type="password" class="form-control" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">登录</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 主系统界面 -->
+    <div id="main-system" style="display: none;">
+        <div class="container-fluid py-4">
+            <!-- 用户信息栏 -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="user-info d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">国际电商仓库存管理系统</h4>
+                            <small>欢迎, <span id="current-user">用户</span> 
+                                <span class="permission-badge badge bg-light text-dark" id="user-role">角色</span>
+                            </small>
+                        </div>
+                        <div class="user-info-buttons">
+                            <button class="btn btn-light btn-sm" onclick="showUserManagement()" id="user-management-btn" style="display: none;">
+                                用户管理
+                            </button>
+                            <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                                退出登录
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 导出导入按钮（仅管理员可见） -->
+            <div class="row mb-4" id="export-import-section" style="display: none;">
+                <div class="col-12">
+                    <div class="export-import-buttons">
+                        <button class="btn btn-success" onclick="exportAllData()">
+                            <i class="bi bi-download"></i> 导出所有数据到Excel
+                        </button>
+                        <button class="btn btn-warning" onclick="showImportModal()">
+                            <i class="bi bi-upload"></i> 从Excel导入数据
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 库存概览 -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card summary-card summary-order">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">已下单未生产数量</h5>
+                            <h2 id="total-order">0</h2>
+                            <div id="order-by-product" class="mt-2 small"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card summary-card summary-production">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">已生产未出库数量</h5>
+                            <h2 id="total-production">0</h2>
+                            <div id="production-by-product" class="mt-2 small"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card summary-card summary-shipment">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">总出库数量</h5>
+                            <h2 id="total-shipment">0</h2>
+                            <div id="shipment-by-product" class="mt-2 small"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 功能导航 -->
+            <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="order-tab" data-bs-toggle="tab" data-bs-target="#order" type="button" role="tab">订单管理</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="production-tab" data-bs-toggle="tab" data-bs-target="#production" type="button" role="tab">生产管理</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="shipment-tab" data-bs-toggle="tab" data-bs-target="#shipment" type="button" role="tab">出库管理</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button" role="tab">库存统计</button>
+                </li>
+            </ul>
+            
+            <!-- 内容区域 -->
+            <div class="tab-content" id="myTabContent">
+                <!-- 订单管理 -->
+                <div class="tab-pane fade show active" id="order" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">订单管理</h5>
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addOrderModal" id="add-order-btn">新增订单</button>
+                        </div>
+                        <div class="card-body">
+                            <!-- 搜索和排序区域 -->
+                            <div class="search-sort-container">
+                                <div class="search-sort-row">
+                                    <input type="text" class="form-control search-input" id="order-search" placeholder="搜索订单编号、产品名称、客户名称...">
+                                    <select class="form-select sort-select" id="order-sort">
+                                        <option value="id-asc">订单编号 (升序)</option>
+                                        <option value="id-desc">订单编号 (降序)</option>
+                                        <option value="product-asc">产品名称 (升序)</option>
+                                        <option value="product-desc">产品名称 (降序)</option>
+                                        <option value="quantity-asc">下单数量 (升序)</option>
+                                        <option value="quantity-desc">下单数量 (降序)</option>
+                                        <option value="date-asc">下单日期 (升序)</option>
+                                        <option value="date-desc">下单日期 (降序)</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" onclick="resetOrderSearch()">
+                                        <i class="bi bi-arrow-clockwise"></i> 重置
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>订单编号</th>
+                                            <th>产品名称</th>
+                                            <th>下单数量</th>
+                                            <th>已生产数量</th>
+                                            <th>未生产数量</th>
+                                            <th>下单日期</th>
+                                            <th>客户名称</th>
+                                            <th>备注</th>
+                                            <th>状态</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="order-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 生产管理 -->
+                <div class="tab-pane fade" id="production" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">生产管理</h5>
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductionModal" id="add-production-btn">新增生产记录</button>
+                        </div>
+                        <div class="card-body">
+                            <!-- 搜索和排序区域 -->
+                            <div class="search-sort-container">
+                                <div class="search-sort-row">
+                                    <input type="text" class="form-control search-input" id="production-search" placeholder="搜索生产批次、订单编号、产品名称...">
+                                    <select class="form-select sort-select" id="production-sort">
+                                        <option value="id-asc">生产批次 (升序)</option>
+                                        <option value="id-desc">生产批次 (降序)</option>
+                                        <option value="orderId-asc">订单编号 (升序)</option>
+                                        <option value="orderId-desc">订单编号 (降序)</option>
+                                        <option value="product-asc">产品名称 (升序)</option>
+                                        <option value="product-desc">产品名称 (降序)</option>
+                                        <option value="quantity-asc">生产数量 (升序)</option>
+                                        <option value="quantity-desc">生产数量 (降序)</option>
+                                        <option value="date-asc">生产日期 (升序)</option>
+                                        <option value="date-desc">生产日期 (降序)</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" onclick="resetProductionSearch()">
+                                        <i class="bi bi-arrow-clockwise"></i> 重置
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>生产批次</th>
+                                            <th>订单编号</th>
+                                            <th>产品名称</th>
+                                            <th>下单数量</th>
+                                            <th>生产数量</th>
+                                            <th>已出库数量</th>
+                                            <th>未出库数量</th>
+                                            <th>生产日期</th>
+                                            <th>负责人</th>
+                                            <th>备注</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="production-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 出库管理 -->
+                <div class="tab-pane fade" id="shipment" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">出库管理</h5>
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addShipmentModal" id="add-shipment-btn">新增出库记录</button>
+                        </div>
+                        <div class="card-body">
+                            <!-- 搜索和排序区域 -->
+                            <div class="search-sort-container">
+                                <div class="search-sort-row">
+                                    <input type="text" class="form-control search-input" id="shipment-search" placeholder="搜索出库单号、订单编号、产品名称...">
+                                    <select class="form-select sort-select" id="shipment-sort">
+                                        <option value="id-asc">出库单号 (升序)</option>
+                                        <option value="id-desc">出库单号 (降序)</option>
+                                        <option value="orderId-asc">订单编号 (升序)</option>
+                                        <option value="orderId-desc">订单编号 (降序)</option>
+                                        <option value="product-asc">产品名称 (升序)</option>
+                                        <option value="product-desc">产品名称 (降序)</option>
+                                        <option value="quantity-asc">出库数量 (升序)</option>
+                                        <option value="quantity-desc">出库数量 (降序)</option>
+                                        <option value="date-asc">出库日期 (升序)</option>
+                                        <option value="date-desc">出库日期 (降序)</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" onclick="resetShipmentSearch()">
+                                        <i class="bi bi-arrow-clockwise"></i> 重置
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>出库单号</th>
+                                            <th>订单编号</th>
+                                            <th>产品名称</th>
+                                            <th>下单数量</th>
+                                            <th>生产数量</th>
+                                            <th>出库数量</th>
+                                            <th>出库日期</th>
+                                            <th>客户名称</th>
+                                            <th>备注</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="shipment-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 库存统计 -->
+                <div class="tab-pane fade" id="inventory" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">库存统计</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>产品名称</th>
+                                            <th>总下单数量</th>
+                                            <th>总生产数量</th>
+                                            <th>总出库数量</th>
+                                            <th>已下单未生产</th>
+                                            <th>已生产未出库</th>
+                                            <th>当前库存</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="inventory-table-body"></tbody>
+                                </table>
+                            </div>
+                            <div class="mt-4">
+                                <canvas id="inventoryChart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增订单模态框 -->
+    <div class="modal fade" id="addOrderModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增订单</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="order-form">
+                        <div class="mb-3">
+                            <label for="order-id" class="form-label">订单编号</label>
+                            <input type="text" class="form-control" id="order-id">
+                            <div class="form-text">可自定义订单编号，如不填写将自动生成</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="order-product" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-quantity" class="form-label">下单数量</label>
+                            <input type="number" class="form-control" id="order-quantity" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-date" class="form-label">下单日期</label>
+                            <input type="date" class="form-control" id="order-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">客户名称</label>
+                            <input type="text" class="form-control readonly-field" id="order-customer" readonly>
+                            <div class="form-text">自动引用当前登录用户</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="order-notes" rows="3"></textarea>
+                            <div class="form-text">可选填写，用于记录订单相关信息</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-order">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑订单模态框 -->
+    <div class="modal fade" id="editOrderModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑订单</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-order-form">
+                        <input type="hidden" id="edit-order-id">
+                        <div class="mb-3">
+                            <label for="edit-order-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="edit-order-product" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-order-quantity" class="form-label">下单数量</label>
+                            <input type="number" class="form-control" id="edit-order-quantity" required>
+                            <div class="max-quantity-help" id="edit-order-quantity-help"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-order-date" class="form-label">下单日期</label>
+                            <input type="date" class="form-control" id="edit-order-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">客户名称</label>
+                            <input type="text" class="form-control readonly-field" id="edit-order-customer" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-order-notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="edit-order-notes" rows="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="update-order">更新</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增生产记录模态框 -->
+    <div class="modal fade" id="addProductionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增生产记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="production-form">
+                        <div class="mb-3">
+                            <label for="production-id" class="form-label">生产批次</label>
+                            <input type="text" class="form-control" id="production-id">
+                            <div class="form-text">可自定义生产批次，如不填写将自动生成。不同订单的生产批次可以重复。</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-order" class="form-label">订单编号</label>
+                            <select class="form-control" id="production-order" required>
+                                <option value="">请选择订单</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="production-product" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-quantity" class="form-label">生产数量</label>
+                            <input type="number" class="form-control" id="production-quantity" required>
+                            <div class="form-text" id="production-quantity-help">最大可生产数量: 0</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-date" class="form-label">生产日期</label>
+                            <input type="date" class="form-control" id="production-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">负责人</label>
+                            <input type="text" class="form-control readonly-field" id="production-manager" readonly>
+                            <div class="form-text">自动引用当前登录用户</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="production-notes" rows="3"></textarea>
+                            <div class="form-text">可选填写，用于记录生产相关信息</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-production">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑生产记录模态框 -->
+    <div class="modal fade" id="editProductionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑生产记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-production-form">
+                        <input type="hidden" id="edit-production-id">
+                        <div class="mb-3">
+                            <label for="edit-production-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="edit-production-product" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-production-quantity" class="form-label">生产数量</label>
+                            <input type="number" class="form-control" id="edit-production-quantity" required>
+                            <div class="max-quantity-help" id="edit-production-quantity-help"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-production-date" class="form-label">生产日期</label>
+                            <input type="date" class="form-control" id="edit-production-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">负责人</label>
+                            <input type="text" class="form-control readonly-field" id="edit-production-manager" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-production-notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="edit-production-notes" rows="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="update-production">更新</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增出库记录模态框 -->
+    <div class="modal fade" id="addShipmentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增出库记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="shipment-form">
+                        <div class="mb-3">
+                            <label for="shipment-id" class="form-label">出库单号</label>
+                            <input type="text" class="form-control" id="shipment-id">
+                            <div class="form-text">可自定义出库单号，如不填写将自动生成</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-production" class="form-label">生产批次</label>
+                            <select class="form-control" id="shipment-production" required>
+                                <option value="">请选择生产批次</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-order" class="form-label">订单编号</label>
+                            <input type="text" class="form-control" id="shipment-order" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="shipment-product" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-quantity" class="form-label">出库数量</label>
+                            <input type="number" class="form-control" id="shipment-quantity" required>
+                            <div class="form-text" id="shipment-quantity-help">最大可出库数量: 0</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-date" class="form-label">出库日期</label>
+                            <input type="date" class="form-control" id="shipment-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">客户名称</label>
+                            <input type="text" class="form-control readonly-field" id="shipment-customer" readonly>
+                            <div class="form-text">自动引用当前登录用户</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="shipment-notes" rows="3"></textarea>
+                            <div class="form-text">可选填写，用于记录出库相关信息</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-shipment">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑出库记录模态框 -->
+    <div class="modal fade" id="editShipmentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑出库记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-shipment-form">
+                        <input type="hidden" id="edit-shipment-id">
+                        <div class="mb-3">
+                            <label for="edit-shipment-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="edit-shipment-product" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-shipment-quantity" class="form-label">出库数量</label>
+                            <input type="number" class="form-control" id="edit-shipment-quantity" required>
+                            <div class="max-quantity-help" id="edit-shipment-quantity-help"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-shipment-date" class="form-label">出库日期</label>
+                            <input type="date" class="form-control" id="edit-shipment-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">客户名称</label>
+                            <input type="text" class="form-control readonly-field" id="edit-shipment-customer" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-shipment-notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="edit-shipment-notes" rows="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="update-shipment">更新</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 数据导入模态框 -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">从Excel导入数据</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="import-type" class="form-label">选择导入数据类型</label>
+                        <select class="form-control" id="import-type">
+                            <option value="all">所有数据</option>
+                            <option value="orders">订单数据</option>
+                            <option value="productions">生产数据</option>
+                            <option value="shipments">出库数据</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="import-file" class="form-label">选择Excel文件</label>
+                        <input type="file" class="form-control" id="import-file" accept=".xlsx, .xls">
+                        <div class="form-text">请选择要导入的Excel文件</div>
+                    </div>
+                    <div class="alert alert-warning">
+                        <strong>注意：</strong>导入数据将覆盖现有数据，请谨慎操作！
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="importData()">导入数据</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 用户管理模态框 -->
+    <div class="modal fade" id="userManagementModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">用户管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <button class="btn btn-success mb-3" onclick="showAddUserModal()">添加新用户</button>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>用户名</th>
+                                    <th>角色</th>
+                                    <th>权限</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加用户模态框 -->
+    <div class="modal fade" id="addUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-user-form">
+                        <div class="mb-3">
+                            <label for="new-username" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="new-username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new-password" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="new-password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="user-role-select" class="form-label">角色</label>
+                            <select class="form-control" id="user-role-select" required>
+                                <option value="admin">管理员</option>
+                                <option value="production_manager">生产主管</option>
+                                <option value="warehouse_manager">仓库主管</option>
+                                <option value="sales">销售员</option>
+                                <option value="viewer">查看员</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="addNewUser()">添加用户</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 无操作警告模态框 -->
+    <div id="inactive-warning" class="inactive-warning" style="display: none;">
+        <h4>系统即将自动退出</h4>
+        <p>由于长时间无操作，系统将在 <span id="countdown">30</span> 秒后自动退出。</p>
+        <button class="btn btn-primary" onclick="stayLoggedIn()">继续使用</button>
+    </div>
+    <div id="overlay" class="overlay" style="display: none;"></div>
+
+    <!-- 加载遮罩 -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">加载中...</span>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 引入SheetJS库 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        // Supabase配置
+        const SUPABASE_URL = 'https://qcrkyofdhdolcncyunbq.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjcmt5b2ZkaGRvbGNuY3l1bmJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI1ODUyNDAsImV4cCI6MjA3ODE2MTI0MH0.CiD9oIR-mH5St-O3vvuFGUSFk1ma1qwC7SJqx5GEhlE';
+        
+        // 创建Supabase客户端
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // 用户和权限管理
+        const USER_ROLES = {
+            admin: {
+                name: '管理员',
+                permissions: ['order_manage', 'production_manage', 'shipment_manage', 'user_manage', 'view_all', 'data_export_import', 'delete_data', 'edit_data']
+            },
+            production_manager: {
+                name: '生产主管',
+                permissions: ['production_manage', 'view_all']
+            },
+            warehouse_manager: {
+                name: '仓库主管',
+                permissions: ['shipment_manage', 'view_all']
+            },
+            sales: {
+                name: '销售员',
+                permissions: ['order_manage', 'view_all']
+            },
+            viewer: {
+                name: '查看员',
+                permissions: ['view_all']
+            }
+        };
+
+        // 默认用户数据
+        const defaultUsers = [
+            { username: 'admin', password: 'admin123', role: 'admin' },
+            { username: 'production', password: 'prod123', role: 'production_manager' },
+            { username: 'warehouse', password: 'ware123', role: 'warehouse_manager' },
+            { username: 'sales', password: 'sales123', role: 'sales' }
+        ];
+
+        // 数据库
+        let database = {
+            users: [],
+            orders: [],
+            productions: [],
+            shipments: []
+        };
+
+        let currentUser = null;
+        
+        // 无操作自动退出相关变量
+        let inactivityTimer;
+        let countdownTimer;
+        let countdownSeconds = 30;
+        const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30分钟
+
+        // 显示/隐藏加载遮罩
+        function showLoading() {
+            document.getElementById('loading-overlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-overlay').style.display = 'none';
+        }
+
+        // 从Supabase加载数据
+        async function loadDataFromSupabase() {
+            showLoading();
+            try {
+                // 加载订单数据
+                const { data: ordersData, error: ordersError } = await supabase
+                    .from('orders')
+                    .select('*');
+                
+                if (ordersError) throw ordersError;
+                database.orders = ordersData || [];
+                
+                // 加载生产数据
+                const { data: productionsData, error: productionsError } = await supabase
+                    .from('productions')
+                    .select('*');
+                
+                if (productionsError) throw productionsError;
+                database.productions = productionsData || [];
+                
+                // 加载出库数据
+                const { data: shipmentsData, error: shipmentsError } = await supabase
+                    .from('shipments')
+                    .select('*');
+                
+                if (shipmentsError) throw shipmentsError;
+                database.shipments = shipmentsData || [];
+                
+                // 加载用户数据
+                const { data: usersData, error: usersError } = await supabase
+                    .from('users')
+                    .select('*');
+                
+                if (usersError) throw usersError;
+                database.users = usersData && usersData.length > 0 ? usersData : defaultUsers;
+                
+                console.log('数据加载成功:', { 
+                    orders: database.orders.length, 
+                    productions: database.productions.length, 
+                    shipments: database.shipments.length,
+                    users: database.users.length
+                });
+                
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                alert('数据加载失败，请检查网络连接或刷新页面重试');
+                // 使用默认数据作为后备
+                database.users = defaultUsers;
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 保存数据到Supabase
+        async function saveData() {
+            showLoading();
+            try {
+                // 保存订单数据
+                if (database.orders.length > 0) {
+                    const { error: ordersError } = await supabase
+                        .from('orders')
+                        .upsert(database.orders, { onConflict: 'id' });
+                    
+                    if (ordersError) throw ordersError;
+                }
+                
+                // 保存生产数据
+                if (database.productions.length > 0) {
+                    const { error: productionsError } = await supabase
+                        .from('productions')
+                        .upsert(database.productions, { onConflict: 'id' });
+                    
+                    if (productionsError) throw productionsError;
+                }
+                
+                // 保存出库数据
+                if (database.shipments.length > 0) {
+                    const { error: shipmentsError } = await supabase
+                        .from('shipments')
+                        .upsert(database.shipments, { onConflict: 'id' });
+                    
+                    if (shipmentsError) throw shipmentsError;
+                }
+                
+                // 保存用户数据
+                if (database.users.length > 0) {
+                    const { error: usersError } = await supabase
+                        .from('users')
+                        .upsert(database.users, { onConflict: 'username' });
+                    
+                    if (usersError) throw usersError;
+                }
+                
+                console.log('数据保存成功');
+                
+            } catch (error) {
+                console.error('保存数据失败:', error);
+                alert('数据保存失败，请检查网络连接');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 重置无操作计时器
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimer);
+            clearTimeout(countdownTimer);
+            
+            // 隐藏警告模态框
+            document.getElementById('inactive-warning').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+            
+            // 重新设置计时器
+            inactivityTimer = setTimeout(showInactivityWarning, INACTIVITY_TIMEOUT);
+        }
+
+        // 显示无操作警告
+        function showInactivityWarning() {
+            countdownSeconds = 30;
+            document.getElementById('countdown').textContent = countdownSeconds;
+            document.getElementById('inactive-warning').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+            
+            countdownTimer = setInterval(function() {
+                countdownSeconds--;
+                document.getElementById('countdown').textContent = countdownSeconds;
+                
+                if (countdownSeconds <= 0) {
+                    clearInterval(countdownTimer);
+                    logout();
+                }
+            }, 1000);
+        }
+
+        // 继续使用系统
+        function stayLoggedIn() {
+            resetInactivityTimer();
+        }
+
+        // 设置无操作监听器
+        function setupInactivityListener() {
+            // 监听用户活动
+            document.addEventListener('mousemove', resetInactivityTimer);
+            document.addEventListener('keypress', resetInactivityTimer);
+            document.addEventListener('click', resetInactivityTimer);
+            document.addEventListener('scroll', resetInactivityTimer);
+            
+            // 初始化计时器
+            resetInactivityTimer();
+        }
+
+        // Excel导出导入功能
+        // 导出所有数据到Excel（包含多个工作表）
+        function exportAllData() {
+            if (!hasPermission('data_export_import')) {
+                alert('您没有权限导出数据！');
+                return;
+            }
+            
+            const wb = XLSX.utils.book_new();
+            const today = new Date().toISOString().split('T')[0];
+            
+            // 1. 订单数据工作表
+            const ordersData = database.orders.map(order => {
+                // 计算已生产数量和未生产数量
+                const relatedProductions = database.productions.filter(p => p.orderId === order.id);
+                const producedQuantity = relatedProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                const remainingQuantity = parseInt(order.quantity) - producedQuantity;
+                
+                return {
+                    '订单编号': order.id,
+                    '产品名称': order.product,
+                    '下单数量': order.quantity,
+                    '已生产数量': producedQuantity,
+                    '未生产数量': remainingQuantity,
+                    '下单日期': order.date,
+                    '客户名称': order.customer,
+                    '备注': order.notes || '',
+                    '状态': remainingQuantity === 0 ? '已完成' : '进行中'
+                };
+            });
+            
+            if (ordersData.length > 0) {
+                const ordersWS = XLSX.utils.json_to_sheet(ordersData);
+                XLSX.utils.book_append_sheet(wb, ordersWS, '订单数据');
+            }
+            
+            // 2. 生产数据工作表
+            const productionsData = database.productions.map(production => {
+                // 计算已出库数量和未出库数量
+                const relatedShipments = database.shipments.filter(s => s.productionId === production.id);
+                const shippedQuantity = relatedShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                const remainingQuantity = parseInt(production.quantity) - shippedQuantity;
+                
+                // 获取订单信息
+                const order = database.orders.find(o => o.id === production.orderId);
+                const orderQuantity = order ? order.quantity : 0;
+                
+                return {
+                    '生产批次': production.id,
+                    '订单编号': production.orderId,
+                    '产品名称': production.product,
+                    '下单数量': orderQuantity,
+                    '生产数量': production.quantity,
+                    '已出库数量': shippedQuantity,
+                    '未出库数量': remainingQuantity,
+                    '生产日期': production.date,
+                    '负责人': production.manager,
+                    '备注': production.notes || ''
+                };
+            });
+            
+            if (productionsData.length > 0) {
+                const productionsWS = XLSX.utils.json_to_sheet(productionsData);
+                XLSX.utils.book_append_sheet(wb, productionsWS, '生产数据');
+            }
+            
+            // 3. 出库数据工作表
+            const shipmentsData = database.shipments.map(shipment => {
+                // 获取订单和生产信息
+                const order = database.orders.find(o => o.id === shipment.orderId);
+                const production = database.productions.find(p => p.id === shipment.productionId);
+                
+                const orderQuantity = order ? order.quantity : 0;
+                const productionQuantity = production ? production.quantity : 0;
+                
+                return {
+                    '出库单号': shipment.id,
+                    '生产批次': shipment.productionId,
+                    '订单编号': shipment.orderId,
+                    '产品名称': shipment.product,
+                    '下单数量': orderQuantity,
+                    '生产数量': productionQuantity,
+                    '出库数量': shipment.quantity,
+                    '出库日期': shipment.date,
+                    '客户名称': shipment.customer,
+                    '备注': shipment.notes || ''
+                };
+            });
+            
+            if (shipmentsData.length > 0) {
+                const shipmentsWS = XLSX.utils.json_to_sheet(shipmentsData);
+                XLSX.utils.book_append_sheet(wb, shipmentsWS, '出库数据');
+            }
+            
+            // 4. 库存统计工作表
+            const allProducts = [...new Set([
+                ...database.orders.map(o => o.product),
+                ...database.productions.map(p => p.product),
+                ...database.shipments.map(s => s.product)
+            ])];
+            
+            const inventoryData = allProducts.map(product => {
+                const totalOrdered = database.orders
+                    .filter(o => o.product === product)
+                    .reduce((sum, o) => sum + parseInt(o.quantity), 0);
+                    
+                const totalProduced = database.productions
+                    .filter(p => p.product === product)
+                    .reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                    
+                const totalShipped = database.shipments
+                    .filter(s => s.product === product)
+                    .reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                    
+                const orderedNotProduced = totalOrdered - totalProduced;
+                const producedNotShipped = totalProduced - totalShipped;
+                const currentStock = producedNotShipped;
+                
+                return {
+                    '产品名称': product,
+                    '总下单数量': totalOrdered,
+                    '总生产数量': totalProduced,
+                    '总出库数量': totalShipped,
+                    '已下单未生产': orderedNotProduced,
+                    '已生产未出库': producedNotShipped,
+                    '当前库存': currentStock
+                };
+            });
+            
+            if (inventoryData.length > 0) {
+                const inventoryWS = XLSX.utils.json_to_sheet(inventoryData);
+                XLSX.utils.book_append_sheet(wb, inventoryWS, '库存统计');
+            }
+            
+            // 5. 系统概览工作表
+            const summaryData = [{
+                '导出时间': new Date().toLocaleString('zh-CN'),
+                '总订单数': database.orders.length,
+                '总生产记录数': database.productions.length,
+                '总出库记录数': database.shipments.length,
+                '产品种类数': allProducts.length,
+                '数据截止日期': today
+            }];
+            
+            const summaryWS = XLSX.utils.json_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, summaryWS, '系统概览');
+            
+            // 导出文件
+            XLSX.writeFile(wb, `库存管理系统完整数据_${today}.xlsx`);
+            alert('数据已成功导出到Excel文件！文件包含多个工作表：系统概览、订单数据、生产数据、出库数据、库存统计。');
+        }
+
+        // 显示导入模态框
+        function showImportModal() {
+            if (!hasPermission('data_export_import')) {
+                alert('您没有权限导入数据！');
+                return;
+            }
+            
+            new bootstrap.Modal(document.getElementById('importModal')).show();
+        }
+
+        // 导入数据
+        function importData() {
+            if (!hasPermission('data_export_import')) {
+                alert('您没有权限导入数据！');
+                return;
+            }
+            
+            const fileInput = document.getElementById('import-file');
+            const importType = document.getElementById('import-type').value;
+            
+            if (!fileInput.files.length) {
+                alert('请选择要导入的Excel文件！');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    let importedCount = 0;
+                    
+                    if (importType === 'all' || importType === 'orders') {
+                        const ordersSheet = workbook.Sheets['订单数据'];
+                        if (ordersSheet) {
+                            const ordersData = XLSX.utils.sheet_to_json(ordersSheet);
+                            if (ordersData.length > 0) {
+                                database.orders = ordersData.map(item => ({
+                                    id: item['订单编号'] || generateId(),
+                                    product: item['产品名称'],
+                                    quantity: parseInt(item['下单数量']),
+                                    date: item['下单日期'],
+                                    customer: item['客户名称'],
+                                    notes: item['备注'] || ''
+                                }));
+                                importedCount += ordersData.length;
+                            }
+                        }
+                    }
+                    
+                    if (importType === 'all' || importType === 'productions') {
+                        const productionsSheet = workbook.Sheets['生产数据'];
+                        if (productionsSheet) {
+                            const productionsData = XLSX.utils.sheet_to_json(productionsSheet);
+                            if (productionsData.length > 0) {
+                                database.productions = productionsData.map(item => ({
+                                    id: item['生产批次'] || generateId(),
+                                    orderId: item['订单编号'],
+                                    product: item['产品名称'],
+                                    quantity: parseInt(item['生产数量']),
+                                    date: item['生产日期'],
+                                    manager: item['负责人'],
+                                    notes: item['备注'] || ''
+                                }));
+                                importedCount += productionsData.length;
+                            }
+                        }
+                    }
+                    
+                    if (importType === 'all' || importType === 'shipments') {
+                        const shipmentsSheet = workbook.Sheets['出库数据'];
+                        if (shipmentsSheet) {
+                            const shipmentsData = XLSX.utils.sheet_to_json(shipmentsSheet);
+                            if (shipmentsData.length > 0) {
+                                database.shipments = shipmentsData.map(item => ({
+                                    id: item['出库单号'] || generateId(),
+                                    productionId: item['生产批次'],
+                                    orderId: item['订单编号'],
+                                    product: item['产品名称'],
+                                    quantity: parseInt(item['出库数量']),
+                                    date: item['出库日期'],
+                                    customer: item['客户名称'],
+                                    notes: item['备注'] || ''
+                                }));
+                                importedCount += shipmentsData.length;
+                            }
+                        }
+                    }
+                    
+                    saveData();
+                    bootstrap.Modal.getInstance(document.getElementById('importModal')).hide();
+                    alert(`成功导入 ${importedCount} 条数据！`);
+                    fileInput.value = '';
+                    
+                } catch (error) {
+                    console.error('导入错误:', error);
+                    alert('导入失败，请检查文件格式是否正确！');
+                }
+            };
+            
+            reader.onerror = function() {
+                alert('文件读取失败！');
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 权限检查函数
+        function hasPermission(permission) {
+            if (!currentUser) return false;
+            const userRole = USER_ROLES[currentUser.role];
+            return userRole.permissions.includes(permission);
+        }
+
+        // 登录功能
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            // 从Supabase加载用户数据
+            await loadDataFromSupabase();
+            
+            const user = database.users.find(u => u.username === username && u.password === password);
+            if (user) {
+                currentUser = user;
+                localStorage.setItem('currentUser', JSON.stringify(user));
+                showMainSystem();
+            } else {
+                alert('用户名或密码错误！');
+            }
+        });
+
+        // 显示主系统
+        async function showMainSystem() {
+            document.getElementById('login-page').style.display = 'none';
+            document.getElementById('main-system').style.display = 'block';
+            
+            // 更新用户界面
+            document.getElementById('current-user').textContent = currentUser.username;
+            document.getElementById('user-role').textContent = USER_ROLES[currentUser.role].name;
+            
+            // 根据权限显示/隐藏功能
+            updateUIByPermissions();
+            await updateUI();
+            
+            // 设置无操作监听器
+            setupInactivityListener();
+        }
+
+        // 根据权限更新界面
+        function updateUIByPermissions() {
+            // 用户管理按钮
+            document.getElementById('user-management-btn').style.display = 
+                hasPermission('user_manage') ? 'block' : 'none';
+            
+            // 订单管理权限
+            document.getElementById('add-order-btn').style.display = 
+                hasPermission('order_manage') ? 'block' : 'none';
+            
+            // 生产管理权限
+            document.getElementById('add-production-btn').style.display = 
+                hasPermission('production_manage') ? 'block' : 'none';
+            
+            // 出库管理权限
+            document.getElementById('add-shipment-btn').style.display = 
+                hasPermission('shipment_manage') ? 'block' : 'none';
+            
+            // Excel导出导入权限（仅管理员可见）
+            document.getElementById('export-import-section').style.display = 
+                hasPermission('data_export_import') ? 'block' : 'none';
+        }
+
+        // 退出登录
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            document.getElementById('login-page').style.display = 'block';
+            document.getElementById('main-system').style.display = 'none';
+            document.getElementById('login-form').reset();
+            
+            // 清除计时器
+            clearTimeout(inactivityTimer);
+            clearTimeout(countdownTimer);
+        }
+
+        // 用户管理
+        function showUserManagement() {
+            updateUserTable();
+            new bootstrap.Modal(document.getElementById('userManagementModal')).show();
+        }
+
+        function updateUserTable() {
+            const tbody = document.getElementById('user-table-body');
+            tbody.innerHTML = '';
+            
+            database.users.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${user.username}</td>
+                    <td>${USER_ROLES[user.role].name}</td>
+                    <td>${USER_ROLES[user.role].permissions.join(', ')}</td>
+                    <td><span class="badge bg-success">激活</span></td>
+                    <td>
+                        ${user.username !== 'admin' ? `
+                        <button class="btn btn-sm btn-warning" onclick="editUser('${user.username}')">编辑</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteUser('${user.username}')">删除</button>
+                        ` : '<span class="text-muted">系统管理员</span>'}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function showAddUserModal() {
+            new bootstrap.Modal(document.getElementById('addUserModal')).show();
+        }
+
+        async function addNewUser() {
+            const username = document.getElementById('new-username').value;
+            const password = document.getElementById('new-password').value;
+            const role = document.getElementById('user-role-select').value;
+            
+            if (database.users.find(u => u.username === username)) {
+                alert('用户名已存在！');
+                return;
+            }
+            
+            database.users.push({ username, password, role });
+            await saveData();
+            
+            bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+            document.getElementById('add-user-form').reset();
+            updateUserTable();
+        }
+
+        async function deleteUser(username) {
+            if (confirm(`确定要删除用户 ${username} 吗？`)) {
+                database.users = database.users.filter(u => u.username !== username);
+                await saveData();
+                updateUserTable();
+            }
+        }
+
+        // 检查是否已登录
+        async function checkLoginStatus() {
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                await loadDataFromSupabase();
+                showMainSystem();
+            }
+        }
+
+        // 删除订单
+        async function deleteOrder(id) {
+            if (!hasPermission('delete_data')) {
+                alert('您没有权限删除订单！');
+                return;
+            }
+            
+            if (confirm('确定要删除此订单吗？')) {
+                const hasProduction = database.productions.some(production => production.orderId === id);
+                if (hasProduction) {
+                    alert('该订单已有生产记录，无法删除！');
+                    return;
+                }
+                
+                database.orders = database.orders.filter(order => order.id !== id);
+                await saveData();
+            }
+        }
+
+        // 编辑订单
+        function editOrder(id) {
+            if (!hasPermission('edit_data')) {
+                alert('您没有权限编辑订单！');
+                return;
+            }
+            
+            const order = database.orders.find(order => order.id === id);
+            if (order) {
+                document.getElementById('edit-order-id').value = order.id;
+                document.getElementById('edit-order-product').value = order.product;
+                document.getElementById('edit-order-quantity').value = order.quantity;
+                document.getElementById('edit-order-date').value = order.date;
+                document.getElementById('edit-order-customer').value = order.customer;
+                document.getElementById('edit-order-notes').value = order.notes || '';
+                
+                // 计算当前已生产数量
+                const relatedProductions = database.productions.filter(p => p.orderId === order.id);
+                const producedQuantity = relatedProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                
+                // 设置最大可编辑数量提示
+                const helpText = `当前已生产数量: ${producedQuantity}，最大可编辑数量: ${parseInt(order.quantity) + producedQuantity}`;
+                document.getElementById('edit-order-quantity-help').textContent = helpText;
+                
+                new bootstrap.Modal(document.getElementById('editOrderModal')).show();
+            }
+        }
+
+        // 更新订单
+        document.getElementById('update-order')?.addEventListener('click', async function() {
+            const id = document.getElementById('edit-order-id').value;
+            const product = document.getElementById('edit-order-product').value;
+            const quantity = document.getElementById('edit-order-quantity').value;
+            const date = document.getElementById('edit-order-date').value;
+            const customer = document.getElementById('edit-order-customer').value;
+            const notes = document.getElementById('edit-order-notes').value;
+            
+            if (product && quantity && date && customer) {
+                const orderIndex = database.orders.findIndex(order => order.id === id);
+                if (orderIndex !== -1) {
+                    const originalOrder = database.orders[orderIndex];
+                    
+                    // 计算当前已生产数量
+                    const relatedProductions = database.productions.filter(p => p.orderId === id);
+                    const producedQuantity = relatedProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                    
+                    // 验证编辑后的数量不能小于已生产数量
+                    if (parseInt(quantity) < producedQuantity) {
+                        alert(`编辑后的下单数量不能小于已生产数量 ${producedQuantity}`);
+                        return;
+                    }
+                    
+                    database.orders[orderIndex] = {
+                        ...database.orders[orderIndex],
+                        product,
+                        quantity: parseInt(quantity),
+                        date,
+                        customer,
+                        notes
+                    };
+                    
+                    await saveData();
+                    bootstrap.Modal.getInstance(document.getElementById('editOrderModal')).hide();
+                }
+            } else {
+                alert('请填写所有必填字段');
+            }
+        });
+
+        // 删除生产记录
+        async function deleteProduction(id) {
+            if (!hasPermission('delete_data')) {
+                alert('您没有权限删除生产记录！');
+                return;
+            }
+            
+            if (confirm('确定要删除此生产记录吗？')) {
+                const hasShipment = database.shipments.some(shipment => shipment.productionId === id);
+                if (hasShipment) {
+                    alert('该生产记录已有出库记录，无法删除！');
+                    return;
+                }
+                
+                database.productions = database.productions.filter(production => production.id !== id);
+                await saveData();
+            }
+        }
+
+        // 编辑生产记录
+        function editProduction(id) {
+            if (!hasPermission('edit_data')) {
+                alert('您没有权限编辑生产记录！');
+                return;
+            }
+            
+            const production = database.productions.find(production => production.id === id);
+            if (production) {
+                document.getElementById('edit-production-id').value = production.id;
+                document.getElementById('edit-production-product').value = production.product;
+                document.getElementById('edit-production-quantity').value = production.quantity;
+                document.getElementById('edit-production-date').value = production.date;
+                document.getElementById('edit-production-manager').value = production.manager;
+                document.getElementById('edit-production-notes').value = production.notes || '';
+                
+                // 获取对应的订单信息
+                const order = database.orders.find(o => o.id === production.orderId);
+                if (order) {
+                    // 计算当前已出库数量
+                    const relatedShipments = database.shipments.filter(s => s.productionId === production.id);
+                    const shippedQuantity = relatedShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                    
+                    // 计算其他生产记录的生产数量
+                    const otherProductions = database.productions.filter(p => 
+                        p.orderId === production.orderId && p.id !== production.id
+                    );
+                    const otherProducedQuantity = otherProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                    
+                    // 计算最大可编辑数量
+                    const maxQuantity = parseInt(order.quantity) - otherProducedQuantity;
+                    
+                    // 设置最大可编辑数量提示
+                    const helpText = `订单总数量: ${order.quantity}，当前已出库数量: ${shippedQuantity}，最大可编辑数量: ${maxQuantity}`;
+                    document.getElementById('edit-production-quantity-help').textContent = helpText;
+                }
+                
+                new bootstrap.Modal(document.getElementById('editProductionModal')).show();
+            }
+        }
+
+        // 更新生产记录
+        document.getElementById('update-production')?.addEventListener('click', async function() {
+            const id = document.getElementById('edit-production-id').value;
+            const quantity = document.getElementById('edit-production-quantity').value;
+            const date = document.getElementById('edit-production-date').value;
+            const manager = document.getElementById('edit-production-manager').value;
+            const notes = document.getElementById('edit-production-notes').value;
+            
+            if (quantity && date && manager) {
+                const productionIndex = database.productions.findIndex(production => production.id === id);
+                if (productionIndex !== -1) {
+                    const production = database.productions[productionIndex];
+                    
+                    // 获取对应的订单信息
+                    const order = database.orders.find(o => o.id === production.orderId);
+                    if (order) {
+                        // 计算当前已出库数量
+                        const relatedShipments = database.shipments.filter(s => s.productionId === production.id);
+                        const shippedQuantity = relatedShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                        
+                        // 计算其他生产记录的生产数量
+                        const otherProductions = database.productions.filter(p => 
+                            p.orderId === production.orderId && p.id !== production.id
+                        );
+                        const otherProducedQuantity = otherProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                        
+                        // 计算最大可编辑数量
+                        const maxQuantity = parseInt(order.quantity) - otherProducedQuantity;
+                        
+                        // 验证编辑后的数量不能小于已出库数量
+                        if (parseInt(quantity) < shippedQuantity) {
+                            alert(`编辑后的生产数量不能小于已出库数量 ${shippedQuantity}`);
+                            return;
+                        }
+                        
+                        // 验证编辑后的数量不能超过订单总数量减去其他生产记录的数量
+                        if (parseInt(quantity) > maxQuantity) {
+                            alert(`编辑后的生产数量不能超过最大可编辑数量 ${maxQuantity}`);
+                            return;
+                        }
+                    }
+                    
+                    database.productions[productionIndex] = {
+                        ...database.productions[productionIndex],
+                        quantity: parseInt(quantity),
+                        date,
+                        manager,
+                        notes
+                    };
+                    
+                    await saveData();
+                    bootstrap.Modal.getInstance(document.getElementById('editProductionModal')).hide();
+                }
+            } else {
+                alert('请填写所有必填字段');
+            }
+        });
+
+        // 删除出库记录
+        async function deleteShipment(id) {
+            if (!hasPermission('delete_data')) {
+                alert('您没有权限删除出库记录！');
+                return;
+            }
+            
+            if (confirm('确定要删除此出库记录吗？')) {
+                database.shipments = database.shipments.filter(shipment => shipment.id !== id);
+                await saveData();
+            }
+        }
+
+        // 编辑出库记录
+        function editShipment(id) {
+            if (!hasPermission('edit_data')) {
+                alert('您没有权限编辑出库记录！');
+                return;
+            }
+            
+            const shipment = database.shipments.find(shipment => shipment.id === id);
+            if (shipment) {
+                document.getElementById('edit-shipment-id').value = shipment.id;
+                document.getElementById('edit-shipment-product').value = shipment.product;
+                document.getElementById('edit-shipment-quantity').value = shipment.quantity;
+                document.getElementById('edit-shipment-date').value = shipment.date;
+                document.getElementById('edit-shipment-customer').value = shipment.customer;
+                document.getElementById('edit-shipment-notes').value = shipment.notes || '';
+                
+                // 获取对应的生产记录信息
+                const production = database.productions.find(p => p.id === shipment.productionId);
+                if (production) {
+                    // 计算其他出库记录的出库数量
+                    const otherShipments = database.shipments.filter(s => 
+                        s.productionId === shipment.productionId && s.id !== shipment.id
+                    );
+                    const otherShippedQuantity = otherShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                    
+                    // 计算最大可编辑数量
+                    const maxQuantity = parseInt(production.quantity) - otherShippedQuantity;
+                    
+                    // 设置最大可编辑数量提示
+                    const helpText = `生产批次总数量: ${production.quantity}，其他出库数量: ${otherShippedQuantity}，最大可编辑数量: ${maxQuantity}`;
+                    document.getElementById('edit-shipment-quantity-help').textContent = helpText;
+                }
+                
+                new bootstrap.Modal(document.getElementById('editShipmentModal')).show();
+            }
+        }
+
+        // 更新出库记录
+        document.getElementById('update-shipment')?.addEventListener('click', async function() {
+            const id = document.getElementById('edit-shipment-id').value;
+            const quantity = document.getElementById('edit-shipment-quantity').value;
+            const date = document.getElementById('edit-shipment-date').value;
+            const customer = document.getElementById('edit-shipment-customer').value;
+            const notes = document.getElementById('edit-shipment-notes').value;
+            
+            if (quantity && date && customer) {
+                const shipmentIndex = database.shipments.findIndex(shipment => shipment.id === id);
+                if (shipmentIndex !== -1) {
+                    const shipment = database.shipments[shipmentIndex];
+                    
+                    // 获取对应的生产记录信息
+                    const production = database.productions.find(p => p.id === shipment.productionId);
+                    if (production) {
+                        // 计算其他出库记录的出库数量
+                        const otherShipments = database.shipments.filter(s => 
+                            s.productionId === shipment.productionId && s.id !== shipment.id
+                        );
+                        const otherShippedQuantity = otherShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                        
+                        // 计算最大可编辑数量
+                        const maxQuantity = parseInt(production.quantity) - otherShippedQuantity;
+                        
+                        // 验证编辑后的数量不能超过最大可编辑数量
+                        if (parseInt(quantity) > maxQuantity) {
+                            alert(`编辑后的出库数量不能超过最大可编辑数量 ${maxQuantity}`);
+                            return;
+                        }
+                    }
+                    
+                    database.shipments[shipmentIndex] = {
+                        ...database.shipments[shipmentIndex],
+                        quantity: parseInt(quantity),
+                        date,
+                        customer,
+                        notes
+                    };
+                    
+                    await saveData();
+                    bootstrap.Modal.getInstance(document.getElementById('editShipmentModal')).hide();
+                }
+            } else {
+                alert('请填写所有必填字段');
+            }
+        });
+
+        // 更新所有界面
+        async function updateUI() {
+            await loadDataFromSupabase();
+            updateOrderTable();
+            updateProductionTable();
+            updateShipmentTable();
+            updateInventoryTable();
+            updateSummaryCards();
+            updateInventoryChart();
+            updateOrderSelect();
+            updateProductionSelect();
+        }
+
+        // 搜索和排序功能
+        // 订单搜索和排序
+        function filterAndSortOrders() {
+            const searchTerm = document.getElementById('order-search').value.toLowerCase();
+            const sortOption = document.getElementById('order-sort').value;
+            
+            let filteredOrders = database.orders.filter(order => {
+                return order.id.toLowerCase().includes(searchTerm) ||
+                       order.product.toLowerCase().includes(searchTerm) ||
+                       order.customer.toLowerCase().includes(searchTerm) ||
+                       (order.notes && order.notes.toLowerCase().includes(searchTerm));
+            });
+            
+            // 排序
+            const [sortField, sortDirection] = sortOption.split('-');
+            filteredOrders.sort((a, b) => {
+                let aValue = a[sortField];
+                let bValue = b[sortField];
+                
+                // 处理数字字段
+                if (sortField === 'quantity') {
+                    aValue = parseInt(aValue);
+                    bValue = parseInt(bValue);
+                }
+                
+                if (sortDirection === 'asc') {
+                    return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+                } else {
+                    return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+                }
+            });
+            
+            return filteredOrders;
+        }
+
+        // 生产记录搜索和排序
+        function filterAndSortProductions() {
+            const searchTerm = document.getElementById('production-search').value.toLowerCase();
+            const sortOption = document.getElementById('production-sort').value;
+            
+            let filteredProductions = database.productions.filter(production => {
+                return production.id.toLowerCase().includes(searchTerm) ||
+                       production.orderId.toLowerCase().includes(searchTerm) ||
+                       production.product.toLowerCase().includes(searchTerm) ||
+                       (production.notes && production.notes.toLowerCase().includes(searchTerm));
+            });
+            
+            // 排序
+            const [sortField, sortDirection] = sortOption.split('-');
+            filteredProductions.sort((a, b) => {
+                let aValue = a[sortField];
+                let bValue = b[sortField];
+                
+                // 处理数字字段
+                if (sortField === 'quantity') {
+                    aValue = parseInt(aValue);
+                    bValue = parseInt(bValue);
+                }
+                
+                if (sortDirection === 'asc') {
+                    return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+                } else {
+                    return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+                }
+            });
+            
+            return filteredProductions;
+        }
+
+        // 出库记录搜索和排序
+        function filterAndSortShipments() {
+            const searchTerm = document.getElementById('shipment-search').value.toLowerCase();
+            const sortOption = document.getElementById('shipment-sort').value;
+            
+            let filteredShipments = database.shipments.filter(shipment => {
+                return shipment.id.toLowerCase().includes(searchTerm) ||
+                       shipment.orderId.toLowerCase().includes(searchTerm) ||
+                       shipment.product.toLowerCase().includes(searchTerm) ||
+                       (shipment.notes && shipment.notes.toLowerCase().includes(searchTerm));
+            });
+            
+            // 排序
+            const [sortField, sortDirection] = sortOption.split('-');
+            filteredShipments.sort((a, b) => {
+                let aValue = a[sortField];
+                let bValue = b[sortField];
+                
+                // 处理数字字段
+                if (sortField === 'quantity') {
+                    aValue = parseInt(aValue);
+                    bValue = parseInt(bValue);
+                }
+                
+                if (sortDirection === 'asc') {
+                    return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+                } else {
+                    return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+                }
+            });
+            
+            return filteredShipments;
+        }
+
+        // 重置搜索
+        function resetOrderSearch() {
+            document.getElementById('order-search').value = '';
+            document.getElementById('order-sort').value = 'id-asc';
+            updateOrderTable();
+        }
+
+        function resetProductionSearch() {
+            document.getElementById('production-search').value = '';
+            document.getElementById('production-sort').value = 'id-asc';
+            updateProductionTable();
+        }
+
+        function resetShipmentSearch() {
+            document.getElementById('shipment-search').value = '';
+            document.getElementById('shipment-sort').value = 'id-asc';
+            updateShipmentTable();
+        }
+
+        // 更新订单表格
+        function updateOrderTable() {
+            const tbody = document.getElementById('order-table-body');
+            tbody.innerHTML = '';
+            
+            const filteredOrders = filterAndSortOrders();
+            
+            filteredOrders.forEach(order => {
+                // 计算已生产数量和未生产数量
+                const relatedProductions = database.productions.filter(p => p.orderId === order.id);
+                const producedQuantity = relatedProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                const remainingQuantity = parseInt(order.quantity) - producedQuantity;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${order.id}</td>
+                    <td>${order.product}</td>
+                    <td>${order.quantity}</td>
+                    <td>${producedQuantity}</td>
+                    <td class="${remainingQuantity > 0 ? 'warning-text' : ''}">${remainingQuantity}</td>
+                    <td>${order.date}</td>
+                    <td>${order.customer}</td>
+                    <td>${order.notes || ''}</td>
+                    <td><span class="badge ${remainingQuantity === 0 ? 'bg-success' : 'bg-warning'}">${remainingQuantity === 0 ? '已完成' : '进行中'}</span></td>
+                    <td>
+                        <div class="action-buttons">
+                            ${hasPermission('edit_data') ? `
+                            <button class="btn btn-sm btn-warning" onclick="editOrder('${order.id}')">编辑</button>
+                            ` : ''}
+                            ${hasPermission('delete_data') ? `
+                            <button class="btn btn-sm btn-danger" onclick="deleteOrder('${order.id}')">删除</button>
+                            ` : ''}
+                            ${!hasPermission('edit_data') && !hasPermission('delete_data') ? '<span class="text-muted">无权限</span>' : ''}
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 更新生产表格
+        function updateProductionTable() {
+            const tbody = document.getElementById('production-table-body');
+            tbody.innerHTML = '';
+            
+            const filteredProductions = filterAndSortProductions();
+            
+            filteredProductions.forEach(production => {
+                // 计算已出库数量和未出库数量
+                const relatedShipments = database.shipments.filter(s => s.productionId === production.id);
+                const shippedQuantity = relatedShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                const remainingQuantity = parseInt(production.quantity) - shippedQuantity;
+                
+                // 获取订单信息
+                const order = database.orders.find(o => o.id === production.orderId);
+                const orderQuantity = order ? order.quantity : 0;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${production.id}</td>
+                    <td>${production.orderId}</td>
+                    <td>${production.product}</td>
+                    <td>${orderQuantity}</td>
+                    <td>${production.quantity}</td>
+                    <td>${shippedQuantity}</td>
+                    <td class="${remainingQuantity > 0 ? 'warning-text' : ''}">${remainingQuantity}</td>
+                    <td>${production.date}</td>
+                    <td>${production.manager}</td>
+                    <td>${production.notes || ''}</td>
+                    <td>
+                        <div class="action-buttons">
+                            ${hasPermission('edit_data') ? `
+                            <button class="btn btn-sm btn-warning" onclick="editProduction('${production.id}')">编辑</button>
+                            ` : ''}
+                            ${hasPermission('delete_data') ? `
+                            <button class="btn btn-sm btn-danger" onclick="deleteProduction('${production.id}')">删除</button>
+                            ` : ''}
+                            ${!hasPermission('edit_data') && !hasPermission('delete_data') ? '<span class="text-muted">无权限</span>' : ''}
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 更新出库表格
+        function updateShipmentTable() {
+            const tbody = document.getElementById('shipment-table-body');
+            tbody.innerHTML = '';
+            
+            const filteredShipments = filterAndSortShipments();
+            
+            filteredShipments.forEach(shipment => {
+                // 获取订单和生产信息
+                const order = database.orders.find(o => o.id === shipment.orderId);
+                const production = database.productions.find(p => p.id === shipment.productionId);
+                
+                const orderQuantity = order ? order.quantity : 0;
+                const productionQuantity = production ? production.quantity : 0;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${shipment.id}</td>
+                    <td>${shipment.orderId}</td>
+                    <td>${shipment.product}</td>
+                    <td>${orderQuantity}</td>
+                    <td>${productionQuantity}</td>
+                    <td>${shipment.quantity}</td>
+                    <td>${shipment.date}</td>
+                    <td>${shipment.customer}</td>
+                    <td>${shipment.notes || ''}</td>
+                    <td>
+                        <div class="action-buttons">
+                            ${hasPermission('edit_data') ? `
+                            <button class="btn btn-sm btn-warning" onclick="editShipment('${shipment.id}')">编辑</button>
+                            ` : ''}
+                            ${hasPermission('delete_data') ? `
+                            <button class="btn btn-sm btn-danger" onclick="deleteShipment('${shipment.id}')">删除</button>
+                            ` : ''}
+                            ${!hasPermission('edit_data') && !hasPermission('delete_data') ? '<span class="text-muted">无权限</span>' : ''}
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 更新库存统计表格
+        function updateInventoryTable() {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = '';
+            
+            // 获取所有产品
+            const allProducts = [...new Set([
+                ...database.orders.map(o => o.product),
+                ...database.productions.map(p => p.product),
+                ...database.shipments.map(s => s.product)
+            ])];
+            
+            allProducts.forEach(product => {
+                // 计算各种数量
+                const totalOrdered = database.orders
+                    .filter(o => o.product === product)
+                    .reduce((sum, o) => sum + parseInt(o.quantity), 0);
+                    
+                const totalProduced = database.productions
+                    .filter(p => p.product === product)
+                    .reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                    
+                const totalShipped = database.shipments
+                    .filter(s => s.product === product)
+                    .reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                    
+                const orderedNotProduced = totalOrdered - totalProduced;
+                const producedNotShipped = totalProduced - totalShipped;
+                const currentStock = producedNotShipped; // 当前库存 = 已生产未出库
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${product}</td>
+                    <td>${totalOrdered}</td>
+                    <td>${totalProduced}</td>
+                    <td>${totalShipped}</td>
+                    <td class="${orderedNotProduced > 0 ? 'warning-text' : ''}">${orderedNotProduced}</td>
+                    <td class="${producedNotShipped > 0 ? 'warning-text' : ''}">${producedNotShipped}</td>
+                    <td>${currentStock}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 更新概览卡片
+        function updateSummaryCards() {
+            // 计算已下单未生产总数
+            let totalOrderedNotProduced = 0;
+            const orderByProduct = {};
+            
+            database.orders.forEach(order => {
+                const relatedProductions = database.productions.filter(p => p.orderId === order.id);
+                const producedQuantity = relatedProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                const remainingQuantity = parseInt(order.quantity) - producedQuantity;
+                
+                totalOrderedNotProduced += Math.max(0, remainingQuantity);
+                
+                if (!orderByProduct[order.product]) {
+                    orderByProduct[order.product] = 0;
+                }
+                orderByProduct[order.product] += Math.max(0, remainingQuantity);
+            });
+            
+            document.getElementById('total-order').textContent = totalOrderedNotProduced;
+            document.getElementById('order-by-product').innerHTML = Object.entries(orderByProduct)
+                .map(([product, quantity]) => `${product}: ${quantity}`).join('<br>');
+            
+            // 计算已生产未出库总数
+            let totalProducedNotShipped = 0;
+            const productionByProduct = {};
+            
+            database.productions.forEach(production => {
+                const relatedShipments = database.shipments.filter(s => s.productionId === production.id);
+                const shippedQuantity = relatedShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                const remainingQuantity = parseInt(production.quantity) - shippedQuantity;
+                
+                totalProducedNotShipped += Math.max(0, remainingQuantity);
+                
+                if (!productionByProduct[production.product]) {
+                    productionByProduct[production.product] = 0;
+                }
+                productionByProduct[production.product] += Math.max(0, remainingQuantity);
+            });
+            
+            document.getElementById('total-production').textContent = totalProducedNotShipped;
+            document.getElementById('production-by-product').innerHTML = Object.entries(productionByProduct)
+                .map(([product, quantity]) => `${product}: ${quantity}`).join('<br>');
+            
+            // 计算总出库数量
+            const totalShipped = database.shipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+            const shipmentByProduct = {};
+            
+            database.shipments.forEach(shipment => {
+                if (!shipmentByProduct[shipment.product]) {
+                    shipmentByProduct[shipment.product] = 0;
+                }
+                shipmentByProduct[shipment.product] += parseInt(shipment.quantity);
+            });
+            
+            document.getElementById('total-shipment').textContent = totalShipped;
+            document.getElementById('shipment-by-product').innerHTML = Object.entries(shipmentByProduct)
+                .map(([product, quantity]) => `${product}: ${quantity}`).join('<br>');
+        }
+
+        // 更新库存图表
+        function updateInventoryChart() {
+            const ctx = document.getElementById('inventoryChart').getContext('2d');
+            
+            // 获取所有产品
+            const allProducts = [...new Set([
+                ...database.orders.map(o => o.product),
+                ...database.productions.map(p => p.product),
+                ...database.shipments.map(s => s.product)
+            ])];
+            
+            const datasets = [];
+            
+            allProducts.forEach(product => {
+                const totalProduced = database.productions
+                    .filter(p => p.product === product)
+                    .reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                    
+                const totalShipped = database.shipments
+                    .filter(s => s.product === product)
+                    .reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                    
+                const currentStock = totalProduced - totalShipped;
+                
+                datasets.push({
+                    label: product,
+                    data: [currentStock],
+                    backgroundColor: getRandomColor()
+                });
+            });
+            
+            // 如果图表已存在，销毁它
+            if (window.inventoryChartInstance) {
+                window.inventoryChartInstance.destroy();
+            }
+            
+            window.inventoryChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['当前库存'],
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // 生成随机颜色
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        // 更新订单选择下拉框
+        function updateOrderSelect() {
+            const select = document.getElementById('production-order');
+            select.innerHTML = '<option value="">请选择订单</option>';
+            
+            database.orders.forEach(order => {
+                const relatedProductions = database.productions.filter(p => p.orderId === order.id);
+                const producedQuantity = relatedProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                const remainingQuantity = parseInt(order.quantity) - producedQuantity;
+                
+                if (remainingQuantity > 0) {
+                    const option = document.createElement('option');
+                    option.value = order.id;
+                    option.textContent = `${order.id} - ${order.product} (剩余: ${remainingQuantity})`;
+                    option.setAttribute('data-product', order.product);
+                    option.setAttribute('data-remaining', remainingQuantity);
+                    select.appendChild(option);
+                }
+            });
+        }
+
+        // 更新生产批次选择下拉框
+        function updateProductionSelect() {
+            const select = document.getElementById('shipment-production');
+            select.innerHTML = '<option value="">请选择生产批次</option>';
+            
+            database.productions.forEach(production => {
+                const relatedShipments = database.shipments.filter(s => s.productionId === production.id);
+                const shippedQuantity = relatedShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                const remainingQuantity = parseInt(production.quantity) - shippedQuantity;
+                
+                if (remainingQuantity > 0) {
+                    const option = document.createElement('option');
+                    option.value = production.id;
+                    option.textContent = `${production.id} - ${production.product} (剩余: ${remainingQuantity})`;
+                    option.setAttribute('data-order', production.orderId);
+                    option.setAttribute('data-product', production.product);
+                    option.setAttribute('data-remaining', remainingQuantity);
+                    select.appendChild(option);
+                }
+            });
+        }
+
+        // 生成唯一ID函数
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // 设置当前用户到表单字段
+        function setCurrentUserToForms() {
+            if (currentUser) {
+                // 设置订单表单的客户名称
+                document.getElementById('order-customer').value = currentUser.username;
+                // 设置生产表单的负责人
+                document.getElementById('production-manager').value = currentUser.username;
+                // 设置出库表单的客户名称
+                document.getElementById('shipment-customer').value = currentUser.username;
+            }
+        }
+
+        // 设置日期字段为今天
+        function setTodayDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('order-date').value = today;
+            document.getElementById('production-date').value = today;
+            document.getElementById('shipment-date').value = today;
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            checkLoginStatus();
+            setTodayDate(); // 设置日期为今天
+
+            // 订单搜索和排序事件监听
+            document.getElementById('order-search')?.addEventListener('input', updateOrderTable);
+            document.getElementById('order-sort')?.addEventListener('change', updateOrderTable);
+            
+            // 生产记录搜索和排序事件监听
+            document.getElementById('production-search')?.addEventListener('input', updateProductionTable);
+            document.getElementById('production-sort')?.addEventListener('change', updateProductionTable);
+            
+            // 出库记录搜索和排序事件监听
+            document.getElementById('shipment-search')?.addEventListener('input', updateShipmentTable);
+            document.getElementById('shipment-sort')?.addEventListener('change', updateShipmentTable);
+
+            // 订单选择变化事件
+            document.getElementById('production-order')?.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                if (selectedOption.value) {
+                    document.getElementById('production-product').value = selectedOption.getAttribute('data-product');
+                    const remaining = parseInt(selectedOption.getAttribute('data-remaining'));
+                    document.getElementById('production-quantity').max = remaining;
+                    document.getElementById('production-quantity-help').textContent = `最大可生产数量: ${remaining}`;
+                } else {
+                    document.getElementById('production-product').value = '';
+                    document.getElementById('production-quantity').max = '';
+                    document.getElementById('production-quantity-help').textContent = '最大可生产数量: 0';
+                }
+            });
+
+            // 生产批次选择变化事件
+            document.getElementById('shipment-production')?.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                if (selectedOption.value) {
+                    document.getElementById('shipment-order').value = selectedOption.getAttribute('data-order');
+                    document.getElementById('shipment-product').value = selectedOption.getAttribute('data-product');
+                    const remaining = parseInt(selectedOption.getAttribute('data-remaining'));
+                    document.getElementById('shipment-quantity').max = remaining;
+                    document.getElementById('shipment-quantity-help').textContent = `最大可出库数量: ${remaining}`;
+                } else {
+                    document.getElementById('shipment-order').value = '';
+                    document.getElementById('shipment-product').value = '';
+                    document.getElementById('shipment-quantity').max = '';
+                    document.getElementById('shipment-quantity-help').textContent = '最大可出库数量: 0';
+                }
+            });
+
+            // 模态框显示时设置当前用户和日期
+            document.getElementById('addOrderModal')?.addEventListener('show.bs.modal', function() {
+                setCurrentUserToForms();
+                document.getElementById('order-date').value = new Date().toISOString().split('T')[0];
+                updateOrderSelect();
+            });
+
+            document.getElementById('addProductionModal')?.addEventListener('show.bs.modal', function() {
+                setCurrentUserToForms();
+                document.getElementById('production-date').value = new Date().toISOString().split('T')[0];
+                updateOrderSelect();
+            });
+
+            document.getElementById('addShipmentModal')?.addEventListener('show.bs.modal', function() {
+                setCurrentUserToForms();
+                document.getElementById('shipment-date').value = new Date().toISOString().split('T')[0];
+                updateProductionSelect();
+            });
+        });
+
+        // 保存订单
+        document.getElementById('save-order')?.addEventListener('click', async function() {
+            if (!hasPermission('order_manage')) {
+                alert('您没有权限添加订单！');
+                return;
+            }
+            
+            let orderId = document.getElementById('order-id').value;
+            const product = document.getElementById('order-product').value;
+            const quantity = document.getElementById('order-quantity').value;
+            const date = document.getElementById('order-date').value;
+            const customer = document.getElementById('order-customer').value;
+            const notes = document.getElementById('order-notes').value;
+            
+            if (product && quantity && date && customer) {
+                if (!orderId) {
+                    orderId = generateId();
+                }
+                
+                const existingOrder = database.orders.find(order => order.id === orderId);
+                if (existingOrder) {
+                    alert('订单编号已存在，请使用其他编号');
+                    return;
+                }
+                
+                database.orders.push({
+                    id: orderId,
+                    product,
+                    quantity: parseInt(quantity),
+                    date,
+                    customer,
+                    notes
+                });
+                
+                await saveData();
+                document.getElementById('order-form').reset();
+                document.getElementById('order-date').value = new Date().toISOString().split('T')[0];
+                setCurrentUserToForms(); // 重置时重新设置当前用户
+                bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide();
+            } else {
+                alert('请填写所有必填字段');
+            }
+        });
+
+        // 保存生产记录
+        document.getElementById('save-production')?.addEventListener('click', async function() {
+            if (!hasPermission('production_manage')) {
+                alert('您没有权限添加生产记录！');
+                return;
+            }
+            
+            let productionId = document.getElementById('production-id').value;
+            const orderId = document.getElementById('production-order').value;
+            const product = document.getElementById('production-product').value;
+            const quantity = document.getElementById('production-quantity').value;
+            const date = document.getElementById('production-date').value;
+            const manager = document.getElementById('production-manager').value;
+            const notes = document.getElementById('production-notes').value;
+            
+            if (orderId && product && quantity && date && manager) {
+                if (!productionId) {
+                    productionId = generateId();
+                }
+                
+                // 修改：只检查同一订单下是否有重复的生产批次
+                const existingProduction = database.productions.find(production => 
+                    production.id === productionId && production.orderId === orderId
+                );
+                if (existingProduction) {
+                    alert('该订单下已存在相同的生产批次，请使用其他批次编号');
+                    return;
+                }
+                
+                // 检查生产数量是否超过剩余数量
+                const selectedOrder = database.orders.find(order => order.id === orderId);
+                const relatedProductions = database.productions.filter(p => p.orderId === orderId);
+                const producedQuantity = relatedProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                const remainingQuantity = parseInt(selectedOrder.quantity) - producedQuantity;
+                
+                if (parseInt(quantity) > remainingQuantity) {
+                    alert(`生产数量不能超过剩余数量 ${remainingQuantity}`);
+                    return;
+                }
+                
+                database.productions.push({
+                    id: productionId,
+                    orderId,
+                    product,
+                    quantity: parseInt(quantity),
+                    date,
+                    manager,
+                    notes
+                });
+                
+                await saveData();
+                document.getElementById('production-form').reset();
+                document.getElementById('production-date').value = new Date().toISOString().split('T')[0];
+                setCurrentUserToForms(); // 重置时重新设置当前用户
+                bootstrap.Modal.getInstance(document.getElementById('addProductionModal')).hide();
+            } else {
+                alert('请填写所有必填字段');
+            }
+        });
+
+        // 保存出库记录
+        document.getElementById('save-shipment')?.addEventListener('click', async function() {
+            if (!hasPermission('shipment_manage')) {
+                alert('您没有权限添加出库记录！');
+                return;
+            }
+            
+            let shipmentId = document.getElementById('shipment-id').value;
+            const productionId = document.getElementById('shipment-production').value;
+            const orderId = document.getElementById('shipment-order').value;
+            const product = document.getElementById('shipment-product').value;
+            const quantity = document.getElementById('shipment-quantity').value;
+            const date = document.getElementById('shipment-date').value;
+            const customer = document.getElementById('shipment-customer').value;
+            const notes = document.getElementById('shipment-notes').value;
+            
+            if (productionId && orderId && product && quantity && date && customer) {
+                if (!shipmentId) {
+                    shipmentId = generateId();
+                }
+                
+                const existingShipment = database.shipments.find(shipment => shipment.id === shipmentId);
+                if (existingShipment) {
+                    alert('出库单号已存在，请使用其他编号');
+                    return;
+                }
+                
+                // 检查出库数量是否超过剩余数量
+                const selectedProduction = database.productions.find(production => production.id === productionId);
+                const relatedShipments = database.shipments.filter(s => s.productionId === productionId);
+                const shippedQuantity = relatedShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                const remainingQuantity = parseInt(selectedProduction.quantity) - shippedQuantity;
+                
+                if (parseInt(quantity) > remainingQuantity) {
+                    alert(`出库数量不能超过剩余数量 ${remainingQuantity}`);
+                    return;
+                }
+                
+                database.shipments.push({
+                    id: shipmentId,
+                    productionId,
+                    orderId,
+                    product,
+                    quantity: parseInt(quantity),
+                    date,
+                    customer,
+                    notes
+                });
+                
+                await saveData();
+                document.getElementById('shipment-form').reset();
+                document.getElementById('shipment-date').value = new Date().toISOString().split('T')[0];
+                setCurrentUserToForms(); // 重置时重新设置当前用户
+                bootstrap.Modal.getInstance(document.getElementById('addShipmentModal')).hide();
+            } else {
+                alert('请填写所有必填字段');
+            }
+        });
+    </script>
+</body>
+</html>
