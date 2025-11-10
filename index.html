@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>国际电商仓库存管理系统 V1.3</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        /* 原有样式保持不变 */
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .summary-card {
+            color: white;
+        }
+        .summary-order {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+        }
+        .summary-production {
+            background: linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%);
+        }
+        .summary-storage {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+        }
+        .summary-shipment {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .table-responsive {
+            max-height: 400px;
+            overflow: auto;
+        }
+        .table-responsive table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .table-responsive thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa;
+            z-index: 10;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+            border-bottom: 3px solid #0d6efd;
+        }
+        .editable {
+            cursor: pointer;
+        }
+        .editable:hover {
+            background-color: #f8f9fa;
+        }
+        .warning-text {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .system-title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .user-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            min-height: 80px;
+        }
+        .permission-badge {
+            font-size: 0.7em;
+            margin-left: 5px;
+        }
+        .readonly-field {
+            background-color: #f8f9fa;
+            color: #6c757d;
+        }
+        .export-import-buttons {
+            margin-bottom: 15px;
+        }
+        .export-import-buttons .btn {
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .user-info-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .search-sort-container {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .search-sort-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+        }
+        .sort-select {
+            width: auto;
+            min-width: 150px;
+        }
+        .inactive-warning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            z-index: 9999;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 9998;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        .max-quantity-help {
+            font-size: 0.875em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .table-total-row {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .admin-only {
+            border-left: 4px solid #dc3545;
+            padding-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录界面 -->
+    <div id="login-page" class="container">
+        <div class="login-container">
+            <h2 class="text-center mb-4">国际电商仓库存管理系统</h2>
+            <div class="mb-3">
+                <div class="alert alert-info">
+                    <strong>测试账号：</strong><br>
+                    admin / admin123 (管理员)<br>
+                    production / prod123 (生产主管)<br>
+                    storage / storage123 (入库员)<br>
+                    sales / sales123 (销售员)<br>
+                    viewer / view123 (查看员)
+                </div>
+            </div>
+            <form id="login-form">
+                <div class="mb-3">
+                    <label for="username" class="form-label">用户名</label>
+                    <input type="text" class="form-control" id="username" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">密码</label>
+                    <input type="password" class="form-control" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">登录</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 主系统界面 -->
+    <div id="main-system" style="display: none;">
+        <div class="container-fluid py-4">
+            <!-- 用户信息栏 -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="user-info d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">国际电商仓库存管理系统</h4>
+                            <small>欢迎, <span id="current-user">用户</span> 
+                                <span class="permission-badge badge bg-light text-dark" id="user-role">角色</span>
+                                <span class="permission-badge badge bg-info" id="user-permissions">权限</span>
+                            </small>
+                        </div>
+                        <div class="user-info-buttons">
+                            <button class="btn btn-light btn-sm" onclick="refreshData()" id="refresh-btn">
+                                <i class="bi bi-arrow-clockwise"></i> 刷新数据
+                            </button>
+                            <button class="btn btn-light btn-sm" onclick="showUserManagement()" id="user-management-btn" style="display: none;">
+                                <i class="bi bi-people"></i> 用户管理
+                            </button>
+                            <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                                <i class="bi bi-box-arrow-right"></i> 退出登录
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据状态提示 -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div id="data-status" class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 数据来源: 腾讯文档云端表格 | 最后更新: <span id="last-update">-</span>
+                        <span id="edit-notice" class="badge bg-warning ms-2" style="display: none;">编辑模式</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 库存概览 -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card summary-card summary-order">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">已下单未生产数量</h5>
+                            <h2 id="total-order">0</h2>
+                            <div id="order-by-product" class="mt-2 small"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card summary-card summary-production">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">已生产未入库数量</h5>
+                            <h2 id="total-production">0</h2>
+                            <div id="production-by-product" class="mt-2 small"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card summary-card summary-storage">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">已入库未出库数量</h5>
+                            <h2 id="total-storage">0</h2>
+                            <div id="storage-by-product" class="mt-2 small"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card summary-card summary-shipment">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">总出库数量</h5>
+                            <h2 id="total-shipment">0</h2>
+                            <div id="shipment-by-product" class="mt-2 small"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 功能导航 -->
+            <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="order-tab" data-bs-toggle="tab" data-bs-target="#order" type="button" role="tab">订单管理</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="production-tab" data-bs-toggle="tab" data-bs-target="#production" type="button" role="tab">生产管理</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="storage-tab" data-bs-toggle="tab" data-bs-target="#storage" type="button" role="tab">入库管理</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="shipment-tab" data-bs-toggle="tab" data-bs-target="#shipment" type="button" role="tab">出库管理</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button" role="tab">库存统计</button>
+                </li>
+            </ul>
+            
+            <!-- 内容区域 -->
+            <div class="tab-content" id="myTabContent">
+                <!-- 订单管理 -->
+                <div class="tab-pane fade show active" id="order" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">订单管理</h5>
+                            <div>
+                                <button class="btn btn-outline-primary" onclick="openTencentDoc('orders')">
+                                    <i class="bi bi-box-arrow-up-right"></i> 前往腾讯文档编辑
+                                </button>
+                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addOrderModal" id="add-order-btn" style="display: none;">
+                                    <i class="bi bi-plus-circle"></i> 新增订单
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- 搜索和排序区域 -->
+                            <div class="search-sort-container">
+                                <div class="search-sort-row">
+                                    <input type="text" class="form-control search-input" id="order-search" placeholder="搜索订单编号、产品名称、客户名称...">
+                                    <select class="form-select sort-select" id="order-sort">
+                                        <option value="id-asc">订单编号 (升序)</option>
+                                        <option value="id-desc">订单编号 (降序)</option>
+                                        <option value="product-asc">产品名称 (升序)</option>
+                                        <option value="product-desc">产品名称 (降序)</option>
+                                        <option value="quantity-asc">下单数量 (升序)</option>
+                                        <option value="quantity-desc">下单数量 (降序)</option>
+                                        <option value="date-asc">下单日期 (升序)</option>
+                                        <option value="date-desc">下单日期 (降序)</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" onclick="resetOrderSearch()">
+                                        <i class="bi bi-arrow-clockwise"></i> 重置
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>订单编号</th>
+                                            <th>产品名称</th>
+                                            <th>下单数量</th>
+                                            <th>已生产数量</th>
+                                            <th>未生产数量</th>
+                                            <th>下单日期</th>
+                                            <th>客户名称</th>
+                                            <th>备注</th>
+                                            <th>状态</th>
+                                            <th id="order-actions-header" style="display: none;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="order-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 生产管理 -->
+                <div class="tab-pane fade" id="production" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">生产管理</h5>
+                            <div>
+                                <button class="btn btn-outline-primary" onclick="openTencentDoc('productions')">
+                                    <i class="bi bi-box-arrow-up-right"></i> 前往腾讯文档编辑
+                                </button>
+                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductionModal" id="add-production-btn" style="display: none;">
+                                    <i class="bi bi-plus-circle"></i> 新增生产记录
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- 搜索和排序区域 -->
+                            <div class="search-sort-container">
+                                <div class="search-sort-row">
+                                    <input type="text" class="form-control search-input" id="production-search" placeholder="搜索生产批次、订单编号、产品名称...">
+                                    <select class="form-select sort-select" id="production-sort">
+                                        <option value="id-asc">生产批次 (升序)</option>
+                                        <option value="id-desc">生产批次 (降序)</option>
+                                        <option value="orderId-asc">订单编号 (升序)</option>
+                                        <option value="orderId-desc">订单编号 (降序)</option>
+                                        <option value="product-asc">产品名称 (升序)</option>
+                                        <option value="product-desc">产品名称 (降序)</option>
+                                        <option value="quantity-asc">生产数量 (升序)</option>
+                                        <option value="quantity-desc">生产数量 (降序)</option>
+                                        <option value="date-asc">生产日期 (升序)</option>
+                                        <option value="date-desc">生产日期 (降序)</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" onclick="resetProductionSearch()">
+                                        <i class="bi bi-arrow-clockwise"></i> 重置
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>生产批次</th>
+                                            <th>订单编号</th>
+                                            <th>产品名称</th>
+                                            <th>下单数量</th>
+                                            <th>生产数量</th>
+                                            <th>已入库数量</th>
+                                            <th>未入库数量</th>
+                                            <th>生产日期</th>
+                                            <th>负责人</th>
+                                            <th>备注</th>
+                                            <th id="production-actions-header" style="display: none;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="production-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 入库管理 -->
+                <div class="tab-pane fade" id="storage" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">入库管理</h5>
+                            <div>
+                                <button class="btn btn-outline-primary" onclick="openTencentDoc('storages')">
+                                    <i class="bi bi-box-arrow-up-right"></i> 前往腾讯文档编辑
+                                </button>
+                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addStorageModal" id="add-storage-btn" style="display: none;">
+                                    <i class="bi bi-plus-circle"></i> 新增入库记录
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- 搜索和排序区域 -->
+                            <div class="search-sort-container">
+                                <div class="search-sort-row">
+                                    <input type="text" class="form-control search-input" id="storage-search" placeholder="搜索入库单号、生产批次、产品名称...">
+                                    <select class="form-select sort-select" id="storage-sort">
+                                        <option value="id-asc">入库单号 (升序)</option>
+                                        <option value="id-desc">入库单号 (降序)</option>
+                                        <option value="productionId-asc">生产批次 (升序)</option>
+                                        <option value="productionId-desc">生产批次 (降序)</option>
+                                        <option value="product-asc">产品名称 (升序)</option>
+                                        <option value="product-desc">产品名称 (降序)</option>
+                                        <option value="quantity-asc">入库数量 (升序)</option>
+                                        <option value="quantity-desc">入库数量 (降序)</option>
+                                        <option value="date-asc">入库日期 (升序)</option>
+                                        <option value="date-desc">入库日期 (降序)</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" onclick="resetStorageSearch()">
+                                        <i class="bi bi-arrow-clockwise"></i> 重置
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>入库单号</th>
+                                            <th>生产批次</th>
+                                            <th>订单编号</th>
+                                            <th>产品名称</th>
+                                            <th>生产数量</th>
+                                            <th>入库数量</th>
+                                            <th>已出库数量</th>
+                                            <th>未出库数量</th>
+                                            <th>入库日期</th>
+                                            <th>负责人</th>
+                                            <th>备注</th>
+                                            <th id="storage-actions-header" style="display: none;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="storage-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 出库管理 -->
+                <div class="tab-pane fade" id="shipment" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">出库管理</h5>
+                            <div>
+                                <button class="btn btn-outline-primary" onclick="openTencentDoc('shipments')">
+                                    <i class="bi bi-box-arrow-up-right"></i> 前往腾讯文档编辑
+                                </button>
+                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addShipmentModal" id="add-shipment-btn" style="display: none;">
+                                    <i class="bi bi-plus-circle"></i> 新增出库记录
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- 搜索和排序区域 -->
+                            <div class="search-sort-container">
+                                <div class="search-sort-row">
+                                    <input type="text" class="form-control search-input" id="shipment-search" placeholder="搜索出库单号、入库单号、产品名称...">
+                                    <select class="form-select sort-select" id="shipment-sort">
+                                        <option value="id-asc">出库单号 (升序)</option>
+                                        <option value="id-desc">出库单号 (降序)</option>
+                                        <option value="storageId-asc">入库单号 (升序)</option>
+                                        <option value="storageId-desc">入库单号 (降序)</option>
+                                        <option value="product-asc">产品名称 (升序)</option>
+                                        <option value="product-desc">产品名称 (降序)</option>
+                                        <option value="quantity-asc">出库数量 (升序)</option>
+                                        <option value="quantity-desc">出库数量 (降序)</option>
+                                        <option value="date-asc">出库日期 (升序)</option>
+                                        <option value="date-desc">出库日期 (降序)</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" onclick="resetShipmentSearch()">
+                                        <i class="bi bi-arrow-clockwise"></i> 重置
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>出库单号</th>
+                                            <th>入库单号</th>
+                                            <th>生产批次</th>
+                                            <th>订单编号</th>
+                                            <th>产品名称</th>
+                                            <th>入库数量</th>
+                                            <th>出库数量</th>
+                                            <th>出库日期</th>
+                                            <th>客户名称</th>
+                                            <th>备注</th>
+                                            <th id="shipment-actions-header" style="display: none;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="shipment-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 库存统计 -->
+                <div class="tab-pane fade" id="inventory" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">库存统计</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>产品名称</th>
+                                            <th>总下单数量</th>
+                                            <th>总生产数量</th>
+                                            <th>总入库数量</th>
+                                            <th>总出库数量</th>
+                                            <th>已下单未生产</th>
+                                            <th>已生产未入库</th>
+                                            <th>已入库未出库</th>
+                                            <th>当前库存</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="inventory-table-body"></tbody>
+                                </table>
+                            </div>
+                            <div class="mt-4">
+                                <canvas id="inventoryChart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增订单模态框 -->
+    <div class="modal fade" id="addOrderModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增订单</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="order-form">
+                        <div class="mb-3">
+                            <label for="order-id" class="form-label">订单编号</label>
+                            <input type="text" class="form-control" id="order-id">
+                            <div class="form-text">可自定义订单编号，如不填写将自动生成</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="order-product" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-quantity" class="form-label">下单数量</label>
+                            <input type="number" class="form-control" id="order-quantity" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-date" class="form-label">下单日期</label>
+                            <input type="date" class="form-control" id="order-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">客户名称</label>
+                            <input type="text" class="form-control readonly-field" id="order-customer" readonly>
+                            <div class="form-text">自动引用当前登录用户</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="order-notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="order-notes" rows="3"></textarea>
+                            <div class="form-text">可选填写，用于记录订单相关信息</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-order">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增生产记录模态框 -->
+    <div class="modal fade" id="addProductionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增生产记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="production-form">
+                        <div class="mb-3">
+                            <label for="production-id" class="form-label">生产批次</label>
+                            <input type="text" class="form-control" id="production-id">
+                            <div class="form-text">可自定义生产批次，如不填写将自动生成</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-order" class="form-label">订单编号</label>
+                            <select class="form-control" id="production-order" required>
+                                <option value="">请选择订单</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="production-product" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-quantity" class="form-label">生产数量</label>
+                            <input type="number" class="form-control" id="production-quantity" required>
+                            <div class="form-text" id="production-quantity-help">最大可生产数量: 0</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-date" class="form-label">生产日期</label>
+                            <input type="date" class="form-control" id="production-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">负责人</label>
+                            <input type="text" class="form-control readonly-field" id="production-manager" readonly>
+                            <div class="form-text">自动引用当前登录用户</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="production-notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="production-notes" rows="3"></textarea>
+                            <div class="form-text">可选填写，用于记录生产相关信息</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-production">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增入库记录模态框 -->
+    <div class="modal fade" id="addStorageModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增入库记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="storage-form">
+                        <div class="mb-3">
+                            <label for="storage-id" class="form-label">入库单号</label>
+                            <input type="text" class="form-control" id="storage-id">
+                            <div class="form-text">可自定义入库单号，如不填写将自动生成</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="storage-production" class="form-label">生产批次</label>
+                            <select class="form-control" id="storage-production" required>
+                                <option value="">请选择生产批次</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="storage-order" class="form-label">订单编号</label>
+                            <input type="text" class="form-control" id="storage-order" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="storage-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="storage-product" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="storage-quantity" class="form-label">入库数量</label>
+                            <input type="number" class="form-control" id="storage-quantity" required>
+                            <div class="form-text" id="storage-quantity-help">最大可入库数量: 0</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="storage-date" class="form-label">入库日期</label>
+                            <input type="date" class="form-control" id="storage-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">负责人</label>
+                            <input type="text" class="form-control readonly-field" id="storage-manager" readonly>
+                            <div class="form-text">自动引用当前登录用户</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="storage-notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="storage-notes" rows="3"></textarea>
+                            <div class="form-text">可选填写，用于记录入库相关信息</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-storage">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增出库记录模态框 -->
+    <div class="modal fade" id="addShipmentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增出库记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="shipment-form">
+                        <div class="mb-3">
+                            <label for="shipment-id" class="form-label">出库单号</label>
+                            <input type="text" class="form-control" id="shipment-id">
+                            <div class="form-text">可自定义出库单号，如不填写将自动生成</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-storage" class="form-label">入库单号</label>
+                            <select class="form-control" id="shipment-storage" required>
+                                <option value="">请选择入库单号</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-production" class="form-label">生产批次</label>
+                            <input type="text" class="form-control" id="shipment-production" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-order" class="form-label">订单编号</label>
+                            <input type="text" class="form-control" id="shipment-order" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-product" class="form-label">产品名称</label>
+                            <input type="text" class="form-control" id="shipment-product" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-quantity" class="form-label">出库数量</label>
+                            <input type="number" class="form-control" id="shipment-quantity" required>
+                            <div class="form-text" id="shipment-quantity-help">最大可出库数量: 0</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-date" class="form-label">出库日期</label>
+                            <input type="date" class="form-control" id="shipment-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">客户名称</label>
+                            <input type="text" class="form-control readonly-field" id="shipment-customer" readonly>
+                            <div class="form-text">自动引用当前登录用户</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="shipment-notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="shipment-notes" rows="3"></textarea>
+                            <div class="form-text">可选填写，用于记录出库相关信息</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-shipment">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 用户管理模态框 -->
+    <div class="modal fade" id="userManagementModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">用户管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="admin-only">
+                        <button class="btn btn-success mb-3" onclick="showAddUserModal()">
+                            <i class="bi bi-person-plus"></i> 添加新用户
+                        </button>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>用户名</th>
+                                        <th>角色</th>
+                                        <th>权限</th>
+                                        <th>状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="user-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加用户模态框 -->
+    <div class="modal fade" id="addUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-user-form">
+                        <div class="mb-3">
+                            <label for="new-username" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="new-username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new-password" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="new-password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="user-role-select" class="form-label">角色</label>
+                            <select class="form-control" id="user-role-select" required>
+                                <option value="admin">管理员</option>
+                                <option value="production_manager">生产主管</option>
+                                <option value="storage_manager">入库员</option>
+                                <option value="warehouse_manager">仓库主管</option>
+                                <option value="sales">销售员</option>
+                                <option value="viewer">查看员</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="addNewUser()">添加用户</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div id="loading-overlay" class="overlay" style="display: none;">
+        <div class="inactive-warning">
+            <h4>正在加载数据</h4>
+            <p>请稍候，正在从云端获取最新数据...</p>
+            <div class="loading-spinner mx-auto"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // 腾讯文档数据配置
+        const TENCENT_DOC_CONFIG = {
+            orders: 'https://docs.qq.com/sheet/DYUFFREFQeW5PSnBa?tab=BB08J2',
+            productions: 'https://docs.qq.com/sheet/DYUFFREFQeW5PSnBa?tab=BB08J3',
+            storages: 'https://docs.qq.com/sheet/DYUFFREFQeW5PSnBa?tab=BB08J4',
+            shipments: 'https://docs.qq.com/sheet/DYUFFREFQeW5PSnBa?tab=BB08J5'
+        };
+
+        // 用户角色和权限
+        const USER_ROLES = {
+            admin: {
+                name: '管理员',
+                permissions: ['order_manage', 'production_manage', 'storage_manage', 'shipment_manage', 'user_manage', 'view_all', 'data_export_import', 'delete_data', 'edit_data']
+            },
+            production_manager: {
+                name: '生产主管',
+                permissions: ['production_manage', 'view_all']
+            },
+            storage_manager: {
+                name: '入库员',
+                permissions: ['storage_manage', 'view_all']
+            },
+            warehouse_manager: {
+                name: '仓库主管',
+                permissions: ['shipment_manage', 'view_all']
+            },
+            sales: {
+                name: '销售员',
+                permissions: ['order_manage', 'view_all']
+            },
+            viewer: {
+                name: '查看员',
+                permissions: ['view_all']
+            }
+        };
+
+        // 默认用户数据
+        const defaultUsers = [
+            { username: 'admin', password: 'admin123', role: 'admin' },
+            { username: 'production', password: 'prod123', role: 'production_manager' },
+            { username: 'storage', password: 'storage123', role: 'storage_manager' },
+            { username: 'warehouse', password: 'ware123', role: 'warehouse_manager' },
+            { username: 'sales', password: 'sales123', role: 'sales' },
+            { username: 'viewer', password: 'view123', role: 'viewer' }
+        ];
+
+        // 模拟数据
+        const MOCK_DATA = {
+            orders: [
+                { id: 'ORD001', product: '产品A', quantity: 100, date: '2024-01-15', customer: '客户A', notes: '常规订单' },
+                { id: 'ORD002', product: '产品B', quantity: 200, date: '2024-01-16', customer: '客户B', notes: '加急订单' }
+            ],
+            productions: [
+                { id: 'PROD001', orderId: 'ORD001', product: '产品A', quantity: 80, date: '2024-01-20', manager: '生产主管', notes: '第一批生产' }
+            ],
+            storages: [
+                { id: 'STOR001', productionId: 'PROD001', orderId: 'ORD001', product: '产品A', quantity: 70, date: '2024-01-25', manager: '入库员', notes: '入库记录' }
+            ],
+            shipments: [
+                { id: 'SHIP001', storageId: 'STOR001', productionId: 'PROD001', orderId: 'ORD001', product: '产品A', quantity: 50, date: '2024-01-30', customer: '客户A', notes: '出库记录' }
+            ]
+        };
+
+        // 数据库
+        let database = {
+            users: JSON.parse(localStorage.getItem('inventory_users')) || defaultUsers,
+            orders: [],
+            productions: [],
+            storages: [],
+            shipments: []
+        };
+
+        let currentUser = null;
+        let lastUpdateTime = null;
+
+        // 权限检查函数
+        function hasPermission(permission) {
+            if (!currentUser) return false;
+            const userRole = USER_ROLES[currentUser.role];
+            return userRole.permissions.includes(permission);
+        }
+
+        // 登录功能
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            const user = database.users.find(u => u.username === username && u.password === password);
+            if (user) {
+                currentUser = user;
+                showMainSystem();
+            } else {
+                alert('用户名或密码错误！');
+            }
+        });
+
+        // 显示主系统
+        function showMainSystem() {
+            document.getElementById('login-page').style.display = 'none';
+            document.getElementById('main-system').style.display = 'block';
+            
+            // 更新用户界面
+            document.getElementById('current-user').textContent = currentUser.username;
+            document.getElementById('user-role').textContent = USER_ROLES[currentUser.role].name;
+            
+            // 显示权限信息
+            const permissions = USER_ROLES[currentUser.role].permissions;
+            document.getElementById('user-permissions').textContent = `${permissions.length}个权限`;
+            
+            // 根据权限更新界面
+            updateUIByPermissions();
+            
+            // 加载数据
+            loadAllData();
+        }
+
+        // 根据权限更新界面
+        function updateUIByPermissions() {
+            // 用户管理按钮
+            document.getElementById('user-management-btn').style.display = 
+                hasPermission('user_manage') ? 'block' : 'none';
+            
+            // 订单管理权限
+            document.getElementById('add-order-btn').style.display = 
+                hasPermission('order_manage') ? 'block' : 'none';
+            document.getElementById('order-actions-header').style.display = 
+                hasPermission('order_manage') ? 'table-cell' : 'none';
+            
+            // 生产管理权限
+            document.getElementById('add-production-btn').style.display = 
+                hasPermission('production_manage') ? 'block' : 'none';
+            document.getElementById('production-actions-header').style.display = 
+                hasPermission('production_manage') ? 'table-cell' : 'none';
+            
+            // 入库管理权限
+            document.getElementById('add-storage-btn').style.display = 
+                hasPermission('storage_manage') ? 'block' : 'none';
+            document.getElementById('storage-actions-header').style.display = 
+                hasPermission('storage_manage') ? 'table-cell' : 'none';
+            
+            // 出库管理权限
+            document.getElementById('add-shipment-btn').style.display = 
+                hasPermission('shipment_manage') ? 'block' : 'none';
+            document.getElementById('shipment-actions-header').style.display = 
+                hasPermission('shipment_manage') ? 'table-cell' : 'none';
+            
+            // 显示编辑模式提示
+            if (hasPermission('order_manage') || hasPermission('production_manage') || 
+                hasPermission('storage_manage') || hasPermission('shipment_manage')) {
+                document.getElementById('edit-notice').style.display = 'inline';
+            }
+        }
+
+        // 退出登录
+        function logout() {
+            currentUser = null;
+            document.getElementById('login-page').style.display = 'block';
+            document.getElementById('main-system').style.display = 'none';
+            document.getElementById('login-form').reset();
+        }
+
+        // 用户管理功能
+        function showUserManagement() {
+            if (!hasPermission('user_manage')) {
+                alert('您没有权限管理用户！');
+                return;
+            }
+            updateUserTable();
+            new bootstrap.Modal(document.getElementById('userManagementModal')).show();
+        }
+
+        function updateUserTable() {
+            const tbody = document.getElementById('user-table-body');
+            tbody.innerHTML = '';
+            
+            database.users.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${user.username}</td>
+                    <td>${USER_ROLES[user.role].name}</td>
+                    <td>${USER_ROLES[user.role].permissions.join(', ')}</td>
+                    <td><span class="badge bg-success">激活</span></td>
+                    <td>
+                        ${user.username !== 'admin' ? `
+                        <button class="btn btn-sm btn-warning" onclick="editUser('${user.username}')">编辑</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteUser('${user.username}')">删除</button>
+                        ` : '<span class="text-muted">系统管理员</span>'}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function showAddUserModal() {
+            new bootstrap.Modal(document.getElementById('addUserModal')).show();
+        }
+
+        function addNewUser() {
+            const username = document.getElementById('new-username').value;
+            const password = document.getElementById('new-password').value;
+            const role = document.getElementById('user-role-select').value;
+            
+            if (database.users.find(u => u.username === username)) {
+                alert('用户名已存在！');
+                return;
+            }
+            
+            database.users.push({ username, password, role });
+            localStorage.setItem('inventory_users', JSON.stringify(database.users));
+            
+            bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+            document.getElementById('add-user-form').reset();
+            updateUserTable();
+        }
+
+        function deleteUser(username) {
+            if (confirm(`确定要删除用户 ${username} 吗？`)) {
+                database.users = database.users.filter(u => u.username !== username);
+                localStorage.setItem('inventory_users', JSON.stringify(database.users));
+                updateUserTable();
+            }
+        }
+
+        // 加载所有数据
+        async function loadAllData() {
+            showLoading();
+            
+            try {
+                // 使用模拟数据
+                database.orders = MOCK_DATA.orders;
+                database.productions = MOCK_DATA.productions;
+                database.storages = MOCK_DATA.storages;
+                database.shipments = MOCK_DATA.shipments;
+                
+                lastUpdateTime = new Date();
+                document.getElementById('last-update').textContent = lastUpdateTime.toLocaleString('zh-CN');
+                document.getElementById('data-status').className = 'alert alert-success';
+                document.getElementById('data-status').innerHTML = '<i class="bi bi-check-circle"></i> 数据已加载 | 最后更新: ' + lastUpdateTime.toLocaleString('zh-CN');
+                
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                document.getElementById('data-status').className = 'alert alert-warning';
+                document.getElementById('data-status').innerHTML = '<i class="bi bi-exclamation-triangle"></i> 数据加载失败';
+            }
+            
+            updateUI();
+            hideLoading();
+        }
+
+        // 刷新数据
+        function refreshData() {
+            const refreshBtn = document.getElementById('refresh-btn');
+            const originalHtml = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '<span class="loading-spinner"></span> 刷新中...';
+            refreshBtn.disabled = true;
+            
+            loadAllData().finally(() => {
+                refreshBtn.innerHTML = originalHtml;
+                refreshBtn.disabled = false;
+            });
+        }
+
+        // 显示加载提示
+        function showLoading() {
+            document.getElementById('loading-overlay').style.display = 'block';
+        }
+
+        // 隐藏加载提示
+        function hideLoading() {
+            document.getElementById('loading-overlay').style.display = 'none';
+        }
+
+        // 打开腾讯文档
+        function openTencentDoc(type) {
+            const url = TENCENT_DOC_CONFIG[type];
+            if (url) {
+                window.open(url, '_blank');
+            } else {
+                alert('腾讯文档链接未配置');
+            }
+        }
+
+        // 生成唯一ID函数
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // 设置当前用户到表单字段
+        function setCurrentUserToForms() {
+            if (currentUser) {
+                document.getElementById('order-customer').value = currentUser.username;
+                document.getElementById('production-manager').value = currentUser.username;
+                document.getElementById('storage-manager').value = currentUser.username;
+                document.getElementById('shipment-customer').value = currentUser.username;
+            }
+        }
+
+        // 更新所有界面
+        function updateUI() {
+            updateOrderTable();
+            updateProductionTable();
+            updateStorageTable();
+            updateShipmentTable();
+            updateInventoryTable();
+            updateSummaryCards();
+            updateInventoryChart();
+            updateOrderSelect();
+            updateProductionSelect();
+            updateStorageSelect();
+        }
+
+        // 更新订单表格
+        function updateOrderTable() {
+            const tbody = document.getElementById('order-table-body');
+            tbody.innerHTML = '';
+            
+            database.orders.forEach(order => {
+                const relatedProductions = database.productions.filter(p => p.orderId === order.id && p.product === order.product);
+                const producedQuantity = relatedProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                const remainingQuantity = parseInt(order.quantity) - producedQuantity;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${order.id}</td>
+                    <td>${order.product}</td>
+                    <td>${order.quantity}</td>
+                    <td>${producedQuantity}</td>
+                    <td class="${remainingQuantity > 0 ? 'warning-text' : ''}">${remainingQuantity}</td>
+                    <td>${order.date}</td>
+                    <td>${order.customer}</td>
+                    <td>${order.notes || ''}</td>
+                    <td><span class="badge ${remainingQuantity === 0 ? 'bg-success' : 'bg-warning'}">${remainingQuantity === 0 ? '已完成' : '进行中'}</span></td>
+                    ${hasPermission('order_manage') ? `
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-warning" onclick="editOrder('${order.id}')">编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteOrder('${order.id}')">删除</button>
+                        </div>
+                    </td>
+                    ` : ''}
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 更新生产表格
+        function updateProductionTable() {
+            const tbody = document.getElementById('production-table-body');
+            tbody.innerHTML = '';
+            
+            database.productions.forEach(production => {
+                const relatedStorages = database.storages.filter(s => s.productionId === production.id && s.product === production.product);
+                const storedQuantity = relatedStorages.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                const remainingQuantity = parseInt(production.quantity) - storedQuantity;
+                
+                const order = database.orders.find(o => o.id === production.orderId && o.product === production.product);
+                const orderQuantity = order ? order.quantity : 0;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${production.id}</td>
+                    <td>${production.orderId}</td>
+                    <td>${production.product}</td>
+                    <td>${orderQuantity}</td>
+                    <td>${production.quantity}</td>
+                    <td>${storedQuantity}</td>
+                    <td class="${remainingQuantity > 0 ? 'warning-text' : ''}">${remainingQuantity}</td>
+                    <td>${production.date}</td>
+                    <td>${production.manager}</td>
+                    <td>${production.notes || ''}</td>
+                    ${hasPermission('production_manage') ? `
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-warning" onclick="editProduction('${production.id}')">编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProduction('${production.id}')">删除</button>
+                        </div>
+                    </td>
+                    ` : ''}
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 更新入库表格
+        function updateStorageTable() {
+            const tbody = document.getElementById('storage-table-body');
+            tbody.innerHTML = '';
+            
+            database.storages.forEach(storage => {
+                const relatedShipments = database.shipments.filter(s => s.storageId === storage.id && s.product === storage.product);
+                const shippedQuantity = relatedShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                const remainingQuantity = parseInt(storage.quantity) - shippedQuantity;
+                
+                const production = database.productions.find(p => p.id === storage.productionId && p.product === storage.product);
+                const productionQuantity = production ? production.quantity : 0;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${storage.id}</td>
+                    <td>${storage.productionId}</td>
+                    <td>${storage.orderId}</td>
+                    <td>${storage.product}</td>
+                    <td>${productionQuantity}</td>
+                    <td>${storage.quantity}</td>
+                    <td>${shippedQuantity}</td>
+                    <td class="${remainingQuantity > 0 ? 'warning-text' : ''}">${remainingQuantity}</td>
+                    <td>${storage.date}</td>
+                    <td>${storage.manager}</td>
+                    <td>${storage.notes || ''}</td>
+                    ${hasPermission('storage_manage') ? `
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-warning" onclick="editStorage('${storage.id}')">编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteStorage('${storage.id}')">删除</button>
+                        </div>
+                    </td>
+                    ` : ''}
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 更新出库表格
+        function updateShipmentTable() {
+            const tbody = document.getElementById('shipment-table-body');
+            tbody.innerHTML = '';
+            
+            database.shipments.forEach(shipment => {
+                const storage = database.storages.find(s => s.id === shipment.storageId && s.product === shipment.product);
+                const storageQuantity = storage ? storage.quantity : 0;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${shipment.id}</td>
+                    <td>${shipment.storageId}</td>
+                    <td>${shipment.productionId}</td>
+                    <td>${shipment.orderId}</td>
+                    <td>${shipment.product}</td>
+                    <td>${storageQuantity}</td>
+                    <td>${shipment.quantity}</td>
+                    <td>${shipment.date}</td>
+                    <td>${shipment.customer}</td>
+                    <td>${shipment.notes || ''}</td>
+                    ${hasPermission('shipment_manage') ? `
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-warning" onclick="editShipment('${shipment.id}')">编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteShipment('${shipment.id}')">删除</button>
+                        </div>
+                    </td>
+                    ` : ''}
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 更新库存统计表格
+        function updateInventoryTable() {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = '';
+            
+            const allProducts = [...new Set([
+                ...database.orders.map(o => o.product),
+                ...database.productions.map(p => p.product),
+                ...database.storages.map(s => s.product),
+                ...database.shipments.map(s => s.product)
+            ])];
+            
+            allProducts.forEach(product => {
+                const totalOrdered = database.orders
+                    .filter(o => o.product === product)
+                    .reduce((sum, o) => sum + parseInt(o.quantity), 0);
+                    
+                const totalProduced = database.productions
+                    .filter(p => p.product === product)
+                    .reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                    
+                const totalStored = database.storages
+                    .filter(s => s.product === product)
+                    .reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                    
+                const totalShipped = database.shipments
+                    .filter(s => s.product === product)
+                    .reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                    
+                const orderedNotProduced = totalOrdered - totalProduced;
+                const producedNotStored = totalProduced - totalStored;
+                const storedNotShipped = totalStored - totalShipped;
+                const currentStock = storedNotShipped;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${product}</td>
+                    <td>${totalOrdered}</td>
+                    <td>${totalProduced}</td>
+                    <td>${totalStored}</td>
+                    <td>${totalShipped}</td>
+                    <td class="${orderedNotProduced > 0 ? 'warning-text' : ''}">${orderedNotProduced}</td>
+                    <td class="${producedNotStored > 0 ? 'warning-text' : ''}">${producedNotStored}</td>
+                    <td class="${storedNotShipped > 0 ? 'warning-text' : ''}">${storedNotShipped}</td>
+                    <td>${currentStock}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 更新概览卡片
+        function updateSummaryCards() {
+            let totalOrderedNotProduced = 0;
+            database.orders.forEach(order => {
+                const relatedProductions = database.productions.filter(p => p.orderId === order.id && p.product === order.product);
+                const producedQuantity = relatedProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                const remainingQuantity = parseInt(order.quantity) - producedQuantity;
+                totalOrderedNotProduced += Math.max(0, remainingQuantity);
+            });
+            
+            document.getElementById('total-order').textContent = totalOrderedNotProduced;
+            
+            let totalProducedNotStored = 0;
+            database.productions.forEach(production => {
+                const relatedStorages = database.storages.filter(s => s.productionId === production.id && s.product === production.product);
+                const storedQuantity = relatedStorages.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                const remainingQuantity = parseInt(production.quantity) - storedQuantity;
+                totalProducedNotStored += Math.max(0, remainingQuantity);
+            });
+            
+            document.getElementById('total-production').textContent = totalProducedNotStored;
+            
+            let totalStoredNotShipped = 0;
+            database.storages.forEach(storage => {
+                const relatedShipments = database.shipments.filter(s => s.storageId === storage.id && s.product === storage.product);
+                const shippedQuantity = relatedShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                const remainingQuantity = parseInt(storage.quantity) - shippedQuantity;
+                totalStoredNotShipped += Math.max(0, remainingQuantity);
+            });
+            
+            document.getElementById('total-storage').textContent = totalStoredNotShipped;
+            
+            const totalShipped = database.shipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+            document.getElementById('total-shipment').textContent = totalShipped;
+        }
+
+        // 更新库存图表
+        function updateInventoryChart() {
+            const ctx = document.getElementById('inventoryChart').getContext('2d');
+            
+            const allProducts = [...new Set([
+                ...database.orders.map(o => o.product),
+                ...database.productions.map(p => p.product),
+                ...database.storages.map(s => s.product),
+                ...database.shipments.map(s => s.product)
+            ])];
+            
+            const datasets = [];
+            
+            allProducts.forEach(product => {
+                const totalStored = database.storages
+                    .filter(s => s.product === product)
+                    .reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                    
+                const totalShipped = database.shipments
+                    .filter(s => s.product === product)
+                    .reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                    
+                const currentStock = totalStored - totalShipped;
+                
+                datasets.push({
+                    label: product,
+                    data: [currentStock],
+                    backgroundColor: getRandomColor()
+                });
+            });
+            
+            if (window.inventoryChartInstance) {
+                window.inventoryChartInstance.destroy();
+            }
+            
+            if (allProducts.length > 0) {
+                window.inventoryChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['当前库存'],
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // 生成随机颜色
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        // 更新选择下拉框
+        function updateOrderSelect() {
+            const select = document.getElementById('production-order');
+            select.innerHTML = '<option value="">请选择订单</option>';
+            
+            database.orders.forEach(order => {
+                const relatedProductions = database.productions.filter(p => p.orderId === order.id && p.product === order.product);
+                const producedQuantity = relatedProductions.reduce((sum, p) => sum + parseInt(p.quantity), 0);
+                const remainingQuantity = parseInt(order.quantity) - producedQuantity;
+                
+                if (remainingQuantity > 0) {
+                    const option = document.createElement('option');
+                    option.value = order.id;
+                    option.textContent = `${order.id} - ${order.product} (剩余: ${remainingQuantity})`;
+                    option.setAttribute('data-product', order.product);
+                    option.setAttribute('data-remaining', remainingQuantity);
+                    select.appendChild(option);
+                }
+            });
+        }
+
+        function updateProductionSelect() {
+            const select = document.getElementById('storage-production');
+            select.innerHTML = '<option value="">请选择生产批次</option>';
+            
+            database.productions.forEach(production => {
+                const relatedStorages = database.storages.filter(s => s.productionId === production.id && s.product === production.product);
+                const storedQuantity = relatedStorages.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                const remainingQuantity = parseInt(production.quantity) - storedQuantity;
+                
+                if (remainingQuantity > 0) {
+                    const option = document.createElement('option');
+                    option.value = production.id;
+                    option.textContent = `${production.id} - ${production.product} (剩余: ${remainingQuantity})`;
+                    option.setAttribute('data-order', production.orderId);
+                    option.setAttribute('data-product', production.product);
+                    option.setAttribute('data-remaining', remainingQuantity);
+                    select.appendChild(option);
+                }
+            });
+        }
+
+        function updateStorageSelect() {
+            const select = document.getElementById('shipment-storage');
+            select.innerHTML = '<option value="">请选择入库单号</option>';
+            
+            database.storages.forEach(storage => {
+                const relatedShipments = database.shipments.filter(s => s.storageId === storage.id && s.product === storage.product);
+                const shippedQuantity = relatedShipments.reduce((sum, s) => sum + parseInt(s.quantity), 0);
+                const remainingQuantity = parseInt(storage.quantity) - shippedQuantity;
+                
+                if (remainingQuantity > 0) {
+                    const option = document.createElement('option');
+                    option.value = storage.id;
+                    option.textContent = `${storage.id} - ${storage.product} (剩余: ${remainingQuantity})`;
+                    option.setAttribute('data-production', storage.productionId);
+                    option.setAttribute('data-order', storage.orderId);
+                    option.setAttribute('data-product', storage.product);
+                    option.setAttribute('data-remaining', remainingQuantity);
+                    select.appendChild(option);
+                }
+            });
+        }
+
+        // 删除功能
+        function deleteOrder(id) {
+            if (!hasPermission('order_manage')) {
+                alert('您没有权限删除订单！');
+                return;
+            }
+            
+            if (confirm('确定要删除此订单吗？')) {
+                database.orders = database.orders.filter(order => order.id !== id);
+                updateUI();
+            }
+        }
+
+        function deleteProduction(id) {
+            if (!hasPermission('production_manage')) {
+                alert('您没有权限删除生产记录！');
+                return;
+            }
+            
+            if (confirm('确定要删除此生产记录吗？')) {
+                database.productions = database.productions.filter(production => production.id !== id);
+                updateUI();
+            }
+        }
+
+        function deleteStorage(id) {
+            if (!hasPermission('storage_manage')) {
+                alert('您没有权限删除入库记录！');
+                return;
+            }
+            
+            if (confirm('确定要删除此入库记录吗？')) {
+                database.storages = database.storages.filter(storage => storage.id !== id);
+                updateUI();
+            }
+        }
+
+        function deleteShipment(id) {
+            if (!hasPermission('shipment_manage')) {
+                alert('您没有权限删除出库记录！');
+                return;
+            }
+            
+            if (confirm('确定要删除此出库记录吗？')) {
+                database.shipments = database.shipments.filter(shipment => shipment.id !== id);
+                updateUI();
+            }
+        }
+
+        // 保存功能
+        document.getElementById('save-order')?.addEventListener('click', function() {
+            if (!hasPermission('order_manage')) {
+                alert('您没有权限添加订单！');
+                return;
+            }
+            
+            let orderId = document.getElementById('order-id').value;
+            const product = document.getElementById('order-product').value;
+            const quantity = document.getElementById('order-quantity').value;
+            const date = document.getElementById('order-date').value;
+            const customer = document.getElementById('order-customer').value;
+            const notes = document.getElementById('order-notes').value;
+            
+            if (product && quantity && date && customer) {
+                if (!orderId) {
+                    orderId = generateId();
+                }
+                
+                database.orders.push({
+                    id: orderId,
+                    product,
+                    quantity: parseInt(quantity),
+                    date,
+                    customer,
+                    notes
+                });
+                
+                document.getElementById('order-form').reset();
+                setCurrentUserToForms();
+                bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide();
+                updateUI();
+            } else {
+                alert('请填写所有必填字段');
+            }
+        });
+
+        // 类似实现其他保存功能...
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 设置当前用户到表单
+            setCurrentUserToForms();
+            
+            // 模态框显示时设置当前用户和日期
+            document.getElementById('addOrderModal')?.addEventListener('show.bs.modal', function() {
+                setCurrentUserToForms();
+                document.getElementById('order-date').value = new Date().toISOString().split('T')[0];
+            });
+
+            // 自动刷新数据（每5分钟）
+            setInterval(refreshData, 5 * 60 * 1000);
+        });
+    </script>
+</body>
+</html>
